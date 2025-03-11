@@ -94,13 +94,61 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ error: error.message, loading: false });
     }
   },
+
+  signUp: async (email, password, userData) => {
+    try {
+      set({ loading: true, error: null });
+
+      // Create a new user account in Supabase authentication
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Sign up error:', error);
+        throw new Error('Failed to register. Please try again.');
+      }
+
+      if (!data.user) {
+        throw new Error('User registration failed.');
+      }
+
+      // Store additional user information in the 'users' table
+      const { data: newUserData, error: userInsertError } = await supabase
+        .from('users')
+        .insert([{
+          id: data.user.id,
+          email,
+          child_birth_year: userData.child_birth_year,
+          child_birth_month: userData.child_birth_month,
+          full_name: userData.full_name || null,
+          nickname: userData.nickname || null,
+          address: userData.address || null,
+          phone: userData.phone || null,
+          is_withdrawn: false
+        }]);
+
+      if (userInsertError) {
+        console.error('User data insertion error:', userInsertError);
+        await supabase.auth.signOut(); // If data insertion fails, sign the user out
+        throw new Error('Registration failed. Please try again.');
+      }
+
+      set({ user: data.user, loading: false });
+    } catch (error: any) {
+      console.error('Sign up process error:', error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
   signIn: async (email, password) => {
     try {
       set({ loading: true, error: null });
-      
+
       // Clear any existing session first
       await supabase.auth.signOut();
-      
+
       const { data: existingUser, error: userCheckError } = await supabase
         .from('users')
         .select('is_withdrawn')
@@ -140,7 +188,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         await supabase.auth.signOut();
         throw new Error('このアカウントは退会済みです。新規登録が必要です。');
       }
-      
+
       set({ user: data.user, loading: false });
     } catch (error: any) {
       console.error('Sign in process error:', error);
@@ -148,6 +196,34 @@ export const useAuth = create<AuthState>((set, get) => ({
       throw error;
     }
   },
+
+
+
+  signOut: async () => {
+  try {
+    set({ loading: true, error: null });
+
+    // Ensure Supabase signOut function is called
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('Sign out error:', error);
+      throw new Error('Failed to log out. Please try again.');
+    }
+
+    // Clear the user state after signing out
+    set({ user: null, loading: false });
+
+  } catch (error: any) {
+    console.error('Sign out process error:', error);
+    set({ error: error.message, loading: false });
+    throw error;
+  }
+}
+
+
+
+
   // ... 他のメソッドは変更なし
 }));
 
