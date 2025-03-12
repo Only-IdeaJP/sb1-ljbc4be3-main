@@ -254,7 +254,7 @@ export const Login: React.FC = () => {
                       name="confirm-password"
                       type={showConfirmPassword ? "text" : "password"}
                       autoComplete="new-password"
-                      required
+                      // required
                       value={formData.confirmPassword}
                       onChange={(e) =>
                         handleFormDataChange("confirmPassword", e.target.value)
