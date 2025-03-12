@@ -1,22 +1,29 @@
-import React from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { UserCircle, Key, CreditCard, UserX, LogOut } from 'lucide-react';
-import { Profile } from './Profile';
-import { Password } from './Password';
-import { Subscription } from './Subscription';
-import { Withdrawal } from './Withdrawal';
-import { useAuth } from '../hooks/useAuth';
+import React from "react";
+import { Routes, Route, Link, useNavigate } from "react-router-dom";
+import { UserCircle, Key, CreditCard, UserX, LogOut } from "lucide-react";
+import { Profile } from "./Profile";
+import { Password } from "./Password";
+import { Subscription } from "./Subscription";
+import { Withdrawal } from "./Withdrawal";
+import { useAuth } from "../hooks/useAuth";
 
 export const MyPage: React.FC = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
+  const handleLogout =  () => {
+    console.log("handleLogout called");
     try {
-      await signOut();
-      navigate('/login');
+    signOut();
+      console.log("signOut completed successfully");
+
+      // Ensure state updates before navigation
+      setTimeout(() => {
+        console.log("Navigating to login...");
+        navigate("/login");
+      }, 100);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
