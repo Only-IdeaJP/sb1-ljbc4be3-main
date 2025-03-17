@@ -1,18 +1,17 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
-export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { user, loading } = useAuth();
+  const { pathname } = useLocation();
 
-  // アップロードページのみログインが必要
-  const isUploadPage = window.location.pathname === '/upload';
-  const isAllPagesPage = window.location.pathname === '/all';
-  const isPracticePage = window.location.pathname === '/practice';
-  const isGradePage = window.location.pathname === '/grade';
-  const isMyPage = window.location.pathname.startsWith('/mypage');
-
-  const requiresAuth = isUploadPage || isAllPagesPage || isPracticePage || isGradePage || isMyPage;
+  // Define protected routes in an array
+  const protectedRoutes = ["/upload", "/all", "/practice", "/grade"];
+  const requiresAuth =
+    protectedRoutes.includes(pathname) || pathname.startsWith("/mypage");
 
   if (loading) {
     return (

@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
-import { 
-  Printer, 
-  Filter, 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { supabase } from "../lib/supabase";
+import {
+  Printer,
+  Filter,
   RefreshCcw,
   Tag as TagIcon,
   Hash,
-  Trash2
-} from 'lucide-react';
+  Trash2,
+} from "lucide-react";
+import { DEFAULT_TAGS } from "../../constant/Constant";
 
 interface Paper {
   id: string;
@@ -19,22 +22,33 @@ interface Paper {
   next_practice_date: string | null;
 }
 
-const DEFAULT_TAGS = [
-  '未測量', '位置表象', '数', '図形', '言語',
-  '推理', '記憶', '論理', '理科的常識', '社会的常識', 'その他'
-];
-
 export const PracticePapers: React.FC = () => {
   const { user } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [selectedPapers, setSelectedPapers] = useState<Paper[]>([]);
-  const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
+  const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(
+    new Set()
+  );
   const [pageCount, setPageCount] = useState(20);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<{ [key: string]: number }>({});
-  const [availableTags, setAvailableTags] = useState<{ tag: string; count: number }[]>([]);
+  const [selectedTags, setSelectedTags] = useState<{ [key: string]: number }>(
+    {}
+  );
+  const [availableTags, setAvailableTags] = useState<
+    { tag: string; count: number }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Memoize shuffle function to avoid re-creating it on every render
+  const shuffleArray = useCallback(<T,>(array: T[]): T[] => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  }, []);
 
   useEffect(() => {
     const fetchPapers = async () => {
@@ -43,26 +57,26 @@ export const PracticePapers: React.FC = () => {
       try {
         const now = new Date().toISOString();
         const { data, error } = await supabase
-          .from('papers')
-          .select('*')
-          .eq('user_id', user.id)
+          .from("papers")
+          .select("*")
+          .eq("user_id", user.id)
           .or(`is_correct.eq.false,next_practice_date.lte.${now}`);
 
         if (error) throw error;
 
         setPapers(data || []);
-        
+
         const tagCounts: { [key: string]: number } = {};
-        data?.forEach(paper => {
-          paper.tags?.forEach(tag => {
+        data?.forEach((paper) => {
+          paper.tags?.forEach((tag: string | number) => {
             tagCounts[tag] = (tagCounts[tag] || 0) + 1;
           });
         });
-        
+
         setAvailableTags(
-          DEFAULT_TAGS.map(tag => ({
+          DEFAULT_TAGS.map((tag) => ({
             tag,
-            count: tagCounts[tag] || 0
+            count: tagCounts[tag] || 0,
           }))
         );
       } catch (err: any) {
@@ -75,16 +89,18 @@ export const PracticePapers: React.FC = () => {
     fetchPapers();
   }, [user]);
 
-  const selectPapers = () => {
+  const selectPapers = useCallback(() => {
     let selectedPaperPool = [...papers];
     let result: Paper[] = [];
 
     if (Object.keys(selectedTags).length > 0) {
       Object.entries(selectedTags).forEach(([tag, count]) => {
-        const tagPapers = selectedPaperPool.filter(p => p.tags.includes(tag));
+        const tagPapers = selectedPaperPool.filter((p) => p.tags.includes(tag));
         const randomTagPapers = shuffleArray(tagPapers).slice(0, count);
         result = [...result, ...randomTagPapers];
-        selectedPaperPool = selectedPaperPool.filter(p => !randomTagPapers.includes(p));
+        selectedPaperPool = selectedPaperPool.filter(
+          (p) => !randomTagPapers.includes(p)
+        );
       });
     } else {
       result = shuffleArray(selectedPaperPool).slice(0, pageCount);
@@ -92,19 +108,12 @@ export const PracticePapers: React.FC = () => {
 
     setSelectedPapers(result);
     setSelectedForRemoval(new Set());
-  };
-
-  const shuffleArray = <T,>(array: T[]): T[] => {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-  };
+  }, [papers, selectedTags, pageCount, shuffleArray]);
 
   const handleRemoveSelected = () => {
-    setSelectedPapers(prev => prev.filter(paper => !selectedForRemoval.has(paper.id)));
+    setSelectedPapers((prev) =>
+      prev.filter((paper) => !selectedForRemoval.has(paper.id))
+    );
     setSelectedForRemoval(new Set());
   };
 
@@ -127,11 +136,13 @@ export const PracticePapers: React.FC = () => {
               type="number"
               min="1"
               value={pageCount}
-              onChange={(e) => setPageCount(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={(e) =>
+                setPageCount(Math.max(1, parseInt(e.target.value) || 1))
+              }
               className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
-          
+
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
@@ -144,21 +155,28 @@ export const PracticePapers: React.FC = () => {
         {showFilters && (
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">タグ別の出題数</h3>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">
+                タグ別の出題数
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {availableTags.map(({ tag, count }) => (
                   <div key={tag} className="flex items-center space-x-2">
-                    <label className="flex-1 text-sm text-gray-700">{tag} ({count}問)</label>
+                    <label className="flex-1 text-sm text-gray-700">
+                      {tag} ({count}問)
+                    </label>
                     <input
                       type="number"
                       min="0"
                       max={count}
                       value={selectedTags[tag] || 0}
                       onChange={(e) => {
-                        const value = Math.max(0, Math.min(count, parseInt(e.target.value) || 0));
-                        setSelectedTags(prev => ({
+                        const value = Math.max(
+                          0,
+                          Math.min(count, parseInt(e.target.value) || 0)
+                        );
+                        setSelectedTags((prev) => ({
                           ...prev,
-                          [tag]: value
+                          [tag]: value,
                         }));
                       }}
                       className="w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -179,7 +197,7 @@ export const PracticePapers: React.FC = () => {
             <RefreshCcw className="h-4 w-4 mr-2" />
             問題を生成
           </button>
-          
+
           {selectedPapers.length > 0 && (
             <>
               <button
@@ -215,7 +233,10 @@ export const PracticePapers: React.FC = () => {
           </div>
         ) : (
           selectedPapers.map((paper, index) => (
-            <div key={paper.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div
+              key={paper.id}
+              className="bg-white rounded-lg shadow-sm overflow-hidden"
+            >
               <div className="p-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-1 bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs font-medium">
@@ -226,7 +247,7 @@ export const PracticePapers: React.FC = () => {
                     type="checkbox"
                     checked={selectedForRemoval.has(paper.id)}
                     onChange={() => {
-                      setSelectedForRemoval(prev => {
+                      setSelectedForRemoval((prev) => {
                         const next = new Set(prev);
                         if (next.has(paper.id)) {
                           next.delete(paper.id);
@@ -241,7 +262,7 @@ export const PracticePapers: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {paper.tags.map(tag => (
+                  {paper.tags.map((tag) => (
                     <span
                       key={tag}
                       className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
@@ -270,14 +291,14 @@ export const PracticePapers: React.FC = () => {
             <div className="mb-4">
               <div className="text-xl font-bold">問題 {index + 1}</div>
               <div className="text-sm text-gray-600 mt-1">
-                {paper.tags.join(' / ')}
+                {paper.tags.join(" / ")}
               </div>
             </div>
             <img
               src={paper.file_path}
               alt={`問題 ${index + 1}`}
               className="w-full h-auto max-h-[80vh]"
-              style={{ pageBreakInside: 'avoid' }}
+              style={{ pageBreakInside: "avoid" }}
             />
           </div>
         ))}

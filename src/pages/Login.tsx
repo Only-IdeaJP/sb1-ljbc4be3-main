@@ -81,7 +81,9 @@ export const Login: React.FC = () => {
     if (!formData.password) {
       validationErrors.push("パスワードは必須です");
     } else if (!validatePassword(formData.password)) {
-      validationErrors.push("パスワードは8文字以上の半角英数字記号で入力してください");
+      validationErrors.push(
+        "パスワードは8文字以上の半角英数字記号で入力してください"
+      );
     }
 
     if (!isLogin && formData.password !== formData.confirmPassword) {
@@ -134,7 +136,9 @@ export const Login: React.FC = () => {
       } else if (err.message.includes("User already registered")) {
         setError("このメールアドレスは既に登録されています");
       } else if (err.message.includes("Email not confirmed")) {
-        setError("メールアドレスの確認が完了していません。確認メールをご確認ください。");
+        setError(
+          "メールアドレスの確認が完了していません。確認メールをご確認ください。"
+        );
       } else {
         setError(err.message || "エラーが発生しました");
       }
@@ -336,6 +340,15 @@ export const Login: React.FC = () => {
                 >
                   ログイン状態を保持する
                 </label>
+
+                <div className="text-sm ms-3">
+                  <a
+                    href="/forget-password"
+                    className="font-medium text-indigo-600 hover:text-indigo-500"
+                  >
+                    パスワードをお忘れですか?
+                  </a>
+                </div>
               </div>
 
               {!isLogin && (

@@ -1,6 +1,7 @@
-import React from 'react';
-import { useDroppable } from '@dnd-kit/core';
-import { Check, Image as ImageIcon, Tag as TagIcon } from 'lucide-react';
+import React from "react";
+import { useDroppable } from "@dnd-kit/core";
+import { Check, Image as ImageIcon, Tag as TagIcon } from "lucide-react";
+import { getTagStyle } from "../../constant/Constant";
 
 interface DroppableIconProps {
   id: string;
@@ -10,33 +11,36 @@ interface DroppableIconProps {
   onClick: () => void;
 }
 
-export const DroppableIcon: React.FC<DroppableIconProps> = ({ 
-  id, 
-  tags, 
-  pageNumber, 
+export const DroppableIcon: React.FC<DroppableIconProps> = ({
+  id,
+  tags,
+  pageNumber,
   preview,
-  onClick 
+  onClick,
 }) => {
   const { isOver, setNodeRef } = useDroppable({
     id: `icon-${id}`,
   });
 
   return (
-    <div 
-      ref={setNodeRef} 
+    <div
+      ref={setNodeRef}
       className="relative group cursor-pointer"
       onClick={onClick}
     >
       {/* メインのプレビュー */}
       <div
         className={`w-24 h-24 rounded-lg overflow-hidden border-2 ${
-          isOver ? 'border-indigo-500 ring-4 ring-indigo-200' : 
-          tags.length > 0 ? 'border-green-500' : 'border-transparent'
+          isOver
+            ? "border-indigo-500 ring-4 ring-indigo-200"
+            : tags.length > 0
+            ? "border-green-500"
+            : "border-transparent"
         } transition-all duration-200 relative hover:border-indigo-300`}
       >
         {preview ? (
-          <img 
-            src={preview} 
+          <img
+            src={preview}
             alt={`ページ ${pageNumber}`}
             className="w-full h-full object-cover"
           />
@@ -45,7 +49,7 @@ export const DroppableIcon: React.FC<DroppableIconProps> = ({
             <ImageIcon className="w-8 h-8 text-gray-400" />
           </div>
         )}
-        
+
         {/* ページ番号 */}
         <div className="absolute top-1 right-1 bg-gray-900/75 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
           {pageNumber}
@@ -65,12 +69,14 @@ export const DroppableIcon: React.FC<DroppableIconProps> = ({
           </div>
         )}
       </div>
-      
+
       {/* タグカウンター */}
       {tags.length > 0 && (
         <div className="absolute -bottom-2 -right-2 flex items-center space-x-1 bg-white rounded-full shadow-lg px-2 py-1 border border-gray-100">
           <TagIcon className="w-3 h-3 text-indigo-500" />
-          <span className="text-xs font-medium text-gray-700">{tags.length}</span>
+          <span className="text-xs font-medium text-gray-700">
+            {tags.length}
+          </span>
         </div>
       )}
 
@@ -81,7 +87,9 @@ export const DroppableIcon: React.FC<DroppableIconProps> = ({
             tags.map((tag, index) => (
               <span
                 key={`${tag}-${index}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getTagStyle(tag)} animate-fadeIn`}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getTagStyle(
+                  tag
+                )} animate-fadeIn`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <TagIcon className="w-3 h-3" />
@@ -98,30 +106,3 @@ export const DroppableIcon: React.FC<DroppableIconProps> = ({
     </div>
   );
 };
-
-function getTagStyle(tag: string): string {
-  switch (tag) {
-    case '未測量':
-      return 'bg-gray-100 text-gray-800';
-    case '位置表象':
-      return 'bg-red-100 text-red-800';
-    case '数':
-      return 'bg-blue-100 text-blue-800';
-    case '図形':
-      return 'bg-green-100 text-green-800';
-    case '言語':
-      return 'bg-yellow-100 text-yellow-800';
-    case '推理':
-      return 'bg-purple-100 text-purple-800';
-    case '記憶':
-      return 'bg-pink-100 text-pink-800';
-    case '論理':
-      return 'bg-indigo-100 text-indigo-800';
-    case '理科的常識':
-      return 'bg-cyan-100 text-cyan-800';
-    case '社会的常識':
-      return 'bg-orange-100 text-orange-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}

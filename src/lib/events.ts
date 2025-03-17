@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serverSupabase } from './server-supabase';
-
 export interface Event {
   id: string;
   user_id: string;
@@ -15,54 +15,38 @@ export interface CreateEventParams {
   data?: any;
 }
 
-export async function createEvent({ user_id, type, data }: CreateEventParams): Promise<Event> {
+export async function createEvent({ user_id, type, data = {} }: CreateEventParams): Promise<Event> {
   const { data: event, error } = await serverSupabase
     .from('events')
-    .insert([
-      {
-        user_id,
-        type,
-        data: data || {},
-      },
-    ])
+    .insert([{ user_id, type, data }])
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating event:', error);
-    throw new Error('イベントの作成に失敗しました');
-  }
+  if (error) throw new Error(`イベントの作成に失敗しました: ${error.message}`);
 
   return event;
 }
 
 export async function getEvents(user_id: string): Promise<Event[]> {
-  const { data: events, error } = await serverSupabase
-    .from('events')
-    .select('*')
-    .eq('user_id', user_id)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching events:', error);
-    throw new Error('イベントの取得に失敗しました');
-  }
-
-  return events || [];
+  return fetchEvents({ user_id });
 }
 
 export async function getEventsByType(user_id: string, type: string): Promise<Event[]> {
-  const { data: events, error } = await serverSupabase
+  return fetchEvents({ user_id, type });
+}
+
+async function fetchEvents(filters: { user_id: string; type?: string }): Promise<Event[]> {
+  const query = serverSupabase
     .from('events')
     .select('*')
-    .eq('user_id', user_id)
-    .eq('type', type)
+    .eq('user_id', filters.user_id)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching events by type:', error);
-    throw new Error('イベントの取得に失敗しました');
-  }
+  if (filters.type) query.eq('type', filters.type);
+
+  const { data: events, error } = await query;
+
+  if (error) throw new Error(`イベントの取得に失敗しました: ${error.message}`);
 
   return events || [];
 }

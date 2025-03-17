@@ -22,6 +22,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import Header from "./components/common/Header";
 import Footer from "./components/common/Footer";
+import ForgetPassword from "./pages/ForgetPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -45,6 +47,8 @@ const App: React.FC = () => {
     { path: "/privacy", element: <Privacy /> },
     { path: "/commerce", element: <Commerce /> },
     { path: "/", element: <Dashboard /> },
+    { path: "/forget-password", element: <ForgetPassword /> },
+    { path: "/reset-password", element: <ResetPassword /> },
   ];
 
   const protectedRoutes = [

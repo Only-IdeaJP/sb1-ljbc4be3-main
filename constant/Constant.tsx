@@ -371,19 +371,31 @@ export const COMMERCE_CONTENT = [
 ];
 
 export const DEFAULT_TAGS = [
-  '未測量', '位置表象', '数', '図形', '言語',
-  '推理', '記憶', '論理', '理科的常識', '社会的常識'
+  "未測量",
+  "位置表象",
+  "数",
+  "図形",
+  "言語",
+  "推理",
+  "記憶",
+  "論理",
+  "理科的常識",
+  "社会的常識",
+  "その他",
 ];
 
 export const TAG_STYLES: Record<string, string> = {
-  '未測量': 'bg-gray-100 text-gray-800 hover:bg-gray-200',
-  '位置表象': 'bg-red-100 text-red-800 hover:bg-red-200',
-  '数': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-  '図形': 'bg-green-100 text-green-800 hover:bg-green-200',
-  '言語': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
-  '推理': 'bg-purple-100 text-purple-800 hover:bg-purple-200',
-  '記憶': 'bg-pink-100 text-pink-800 hover:bg-pink-200',
-  '論理': 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
-  '理科的常識': 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200',
-  '社会的常識': 'bg-orange-100 text-orange-800 hover:bg-orange-200',
+  未測量: "bg-gray-100 text-gray-800 hover:bg-gray-200",
+  位置表象: "bg-red-100 text-red-800 hover:bg-red-200",
+  数: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+  図形: "bg-green-100 text-green-800 hover:bg-green-200",
+  言語: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+  推理: "bg-purple-100 text-purple-800 hover:bg-purple-200",
+  記憶: "bg-pink-100 text-pink-800 hover:bg-pink-200",
+  論理: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200",
+  理科的常識: "bg-cyan-100 text-cyan-800 hover:bg-cyan-200",
+  社会的常識: "bg-orange-100 text-orange-800 hover:bg-orange-200",
 };
+
+export const getTagStyle = (tag: string): string =>
+  TAG_STYLES[tag] || "bg-gray-100 text-gray-800 hover:bg-gray-200";

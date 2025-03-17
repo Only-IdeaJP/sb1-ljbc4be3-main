@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback } from 'react';
 import { createEvent, getEvents, getEventsByType, Event } from '../lib/events';
 import { useAuth } from './useAuth';
@@ -8,63 +9,38 @@ export function useEvents() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(async () => {
+  // Generic function to fetch events
+  const fetchData = async (fetchFunction: () => Promise<Event[]>) => {
     if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await getEvents(user.id);
+      const data = await fetchFunction();
       setEvents(data);
     } catch (err: any) {
-      setError(err.message);
       console.error('Error fetching events:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const fetchEventsByType = useCallback(async (type: string) => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getEventsByType(user.id, type);
-      setEvents(data);
-    } catch (err: any) {
       setError(err.message);
-      console.error('Error fetching events by type:', err);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
+
+  const fetchEvents = useCallback(() => fetchData(() => getEvents(user!.id)), [user]);
+  const fetchEventsByType = useCallback((type: string) => fetchData(() => getEventsByType(user!.id, type)), [user]);
 
   const addEvent = useCallback(async (type: string, data?: any) => {
     if (!user) {
-      setError('ユーザーがログインしていません');
+      setError('User is not logged in');
       return;
     }
-    setError(null);
     try {
-      const event = await createEvent({
-        user_id: user.id,
-        type,
-        data,
-      });
-      setEvents(prev => [event, ...prev]);
-      return event;
+      const newEvent = await createEvent({ user_id: user.id, type, data });
+      setEvents(prev => [newEvent, ...prev]);
     } catch (err: any) {
-      setError(err.message);
       console.error('Error adding event:', err);
-      throw err;
+      setError(err.message);
     }
   }, [user]);
 
-  return {
-    events,
-    loading,
-    error,
-    fetchEvents,
-    fetchEventsByType,
-    addEvent,
-  };
+  return { events, loading, error, fetchEvents, fetchEventsByType, addEvent };
 }
