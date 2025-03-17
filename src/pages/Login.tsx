@@ -341,14 +341,14 @@ export const Login: React.FC = () => {
                   ログイン状態を保持する
                 </label>
 
-                <div className="text-sm ms-3">
+                {/* <div className="text-sm ms-3">
                   <a
                     href="/forget-password"
                     className="font-medium text-indigo-600 hover:text-indigo-500"
                   >
                     パスワードをお忘れですか?
                   </a>
-                </div>
+                </div> */}
               </div>
 
               {!isLogin && (
