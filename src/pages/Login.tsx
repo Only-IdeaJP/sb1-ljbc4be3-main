@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { HotToast } from "../components/Toaster";
 
 // Validation Functions
 const validateEmail = (email: string) =>
@@ -108,6 +109,7 @@ export const Login: React.FC = () => {
     try {
       if (isLogin) {
         await signIn(formData.email, formData.password);
+        HotToast.success("ログイン成功！");
         navigate("/");
       } else {
         await signUp(formData.email, formData.password, {
@@ -116,8 +118,9 @@ export const Login: React.FC = () => {
           address: "",
           phone: "",
         });
+        HotToast.error("アカウントを作成しました。ログインしてください。");
 
-        setError("アカウントを作成しました。ログインしてください。");
+        // setError("アカウントを作成しました。ログインしてください。");
         setIsLogin(true);
         setFormData({
           email: "",
@@ -132,15 +135,21 @@ export const Login: React.FC = () => {
 
       // Customize error messages for specific known errors
       if (err.message === "Invalid login credentials") {
-        setError("メールアドレスまたはパスワードが正しくありません");
+        HotToast.error("メールアドレスまたはパスワードが正しくありません");
+        // setError("メールアドレスまたはパスワードが正しくありません");
       } else if (err.message.includes("User already registered")) {
-        setError("このメールアドレスは既に登録されています");
+        HotToast.error("このメールアドレスは既に登録されています");
+        // setError("このメールアドレスは既に登録されています");
       } else if (err.message.includes("Email not confirmed")) {
-        setError(
+        HotToast.error(
           "メールアドレスの確認が完了していません。確認メールをご確認ください。"
         );
+        // setError(
+        //   "メールアドレスの確認が完了していません。確認メールをご確認ください。"
+        // );
       } else {
-        setError(err.message || "エラーが発生しました");
+        HotToast.error(err.message || "エラーが発生しました");
+        // setError(err.message || "エラーが発生しました");
       }
     } finally {
       setLoading(false); // End loading state

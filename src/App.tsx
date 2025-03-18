@@ -24,6 +24,7 @@ import Header from "./components/common/Header";
 import Footer from "./components/common/Footer";
 import ForgetPassword from "./pages/ForgetPassword";
 import ResetPassword from "./pages/ResetPassword";
+import { ToastContainer } from "./components/Toaster";
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -84,6 +85,7 @@ const App: React.FC = () => {
           </Routes>
         </main>
         <Footer />
+        <ToastContainer /> {/* Add this here */}
       </div>
     </Router>
   );

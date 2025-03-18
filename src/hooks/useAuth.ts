@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 
@@ -30,25 +27,61 @@ export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   loading: true,
   error: null,
-
   setUser: (user) => set({ user }),
-  // @ts-ignore
   initialize: async () => {
     try {
-      set({ loading: true });
-
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const user = await fetchUserData(session.user.id);
+      if (session?.access_token) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token);
+        if (userError) {
+          console.error('User fetch error:', userError);
+          await supabase.auth.signOut();
+          set({ user: null, loading: false });
+          return;
+        }
+
+        const { data: userData, error: userDataError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user?.id)
+          .eq('is_withdrawn', false)
+          .single();
+
+        if (userDataError || !userData) {
+          console.error('User data fetch error:', userDataError);
+          await supabase.auth.signOut();
+          set({ user: null, loading: false });
+          return;
+        }
+
         set({ user, loading: false });
       } else {
         set({ user: null, loading: false });
       }
 
-      // Listen to auth state changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session?.user) {
-          const user = await fetchUserData(session.user.id);
+        if (session?.access_token) {
+          const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token);
+          if (userError) {
+            console.error('Auth state change user error:', userError);
+            set({ user: null, loading: false });
+            return;
+          }
+
+          const { data: userData, error: userDataError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user?.id)
+            .eq('is_withdrawn', false)
+            .single();
+
+          if (userDataError || !userData) {
+            console.error('Auth state change user data error:', userDataError);
+            await supabase.auth.signOut();
+            set({ user: null, loading: false });
+            return;
+          }
+
           set({ user, loading: false });
         } else {
           set({ user: null, loading: false });
@@ -62,57 +95,58 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
   },
 
-  refreshUser: async () => {
-    try {
-      const currentUser = get().user;
-      if (!currentUser) throw new Error('No authenticated user.');
-
-      const updatedUser = await fetchUserData(currentUser.id);
-      set({ user: updatedUser });
-    } catch (error: any) {
-      console.error('User refresh error:', error);
-      set({ error: error.message });
-    }
-  },
-
-  checkAuth: async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      return !!session?.user;
-    } catch (error) {
-      console.error('Auth check error:', error);
-      return false;
-    }
-  },
-
   signUp: async (email, password, userData) => {
     try {
       set({ loading: true, error: null });
 
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error || !data.user) throw new Error('Registration failed.');
+      // Create a new user account in Supabase authentication
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-      const { error: userInsertError } = await supabase
+      if (error) {
+        console.error('Sign up error:', error);
+        throw new Error('Failed to register. Please try again.');
+      }
+
+      if (!data.user) {
+        throw new Error('User registration failed.');
+      }
+
+      // Store additional user information in the 'users' table
+      const { data: newUserData, error: userInsertError } = await supabase
         .from('users')
-        .insert([{ id: data.user.id, email, ...userData, is_withdrawn: false }]);
+        .insert([{
+          id: data.user.id,
+          email,
+          child_birth_year: userData.child_birth_year,
+          child_birth_month: userData.child_birth_month,
+          full_name: userData.full_name || null,
+          nickname: userData.nickname || null,
+          address: userData.address || null,
+          phone: userData.phone || null,
+          is_withdrawn: false
+        }]);
 
       if (userInsertError) {
-        await supabase.auth.signOut();
+        console.error('User data insertion error:', userInsertError);
+        await supabase.auth.signOut(); // If data insertion fails, sign the user out
         throw new Error('Registration failed. Please try again.');
       }
 
       set({ user: data.user, loading: false });
     } catch (error: any) {
-      console.error('Sign up error:', error);
+      console.error('Sign up process error:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
   },
-
   signIn: async (email, password) => {
     try {
       set({ loading: true, error: null });
 
+      // Clear any existing session first
       await supabase.auth.signOut();
 
       const { data: existingUser, error: userCheckError } = await supabase
@@ -125,56 +159,73 @@ export const useAuth = create<AuthState>((set, get) => ({
         throw new Error('このアカウントは退会済みです。新規登録が必要です。');
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error('メールアドレスまたはパスワードが正しくありません');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      const user = await fetchUserData(data.user.id);
-      set({ user, loading: false });
+      if (error) {
+        console.error('Sign in error:', error);
+        if (error.message === 'Invalid login credentials') {
+          throw new Error('メールアドレスまたはパスワードが正しくありません');
+        }
+        throw error;
+      }
+
+      if (!data.user) {
+        throw new Error('ログインに失敗しました');
+      }
+
+      const { data: userData, error: userDataError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .eq('is_withdrawn', false)
+        .single();
+
+      if (userDataError || !userData) {
+        console.error('User data fetch error after login:', userDataError);
+        await supabase.auth.signOut();
+        throw new Error('このアカウントは退会済みです。新規登録が必要です。');
+      }
+
+      set({ user: data.user, loading: false });
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.error('Sign in process error:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
   },
+
+
 
   signOut: async () => {
     try {
       set({ loading: true, error: null });
 
+      // Ensure Supabase signOut function is called
       const { error } = await supabase.auth.signOut();
-      if (error) throw new Error('Failed to log out.');
 
+      if (error) {
+        console.error('Sign out error:', error);
+        throw new Error('Failed to log out. Please try again.');
+      }
+
+      // Clear the user state after signing out
       set({ user: null, loading: false });
+
     } catch (error: any) {
-      console.error('Sign out error:', error);
+      console.error('Sign out process error:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
-  },
-}));
-
-// Fetch user data from Supabase
-const fetchUserData = async (userId: string) => {
-  try {
-    const { data: userData, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .eq('is_withdrawn', false)
-      .single();
-
-    if (error || !userData) {
-      console.error('User data fetch error:', error);
-      await supabase.auth.signOut();
-      throw new Error('User data not found.');
-    }
-
-    return userData;
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    return null;
   }
-};
+
+
+
+
+  // ... 他のメソッドは変更なし
+}));
 
 // Initialize auth state
 useAuth.getState().initialize();
