@@ -1,29 +1,30 @@
 import React from "react";
 import {
+  Navigate,
+  Route,
   BrowserRouter as Router,
   Routes,
-  Route,
-  Navigate,
 } from "react-router-dom";
-import { Login } from "./pages/Login";
-import { Dashboard } from "./pages/Dashboard";
-import { MyPage } from "./pages/MyPage";
-import { PracticePapers } from "./pages/PracticePapers";
-import { GradePapers } from "./pages/GradePapers";
+import Footer from "./components/common/Footer";
+import Header from "./components/common/Header";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ToastContainer } from "./components/Toaster";
+import { useAuth } from "./hooks/useAuth";
 import { AllPages } from "./pages/AllPages";
+import { Commerce } from "./pages/Commerce";
+import { Contact } from "./pages/Contact";
+import { Dashboard } from "./pages/Dashboard";
 import { FAQ } from "./pages/FAQ";
 import { Features } from "./pages/Features";
-import { Contact } from "./pages/Contact";
-import { Terms } from "./pages/Terms";
-import { Privacy } from "./pages/Privacy";
-import { Commerce } from "./pages/Commerce";
-import UploadPapers from "./pages/UploadPapers";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { useAuth } from "./hooks/useAuth";
-import Header from "./components/common/Header";
-import Footer from "./components/common/Footer";
 import ForgetPassword from "./pages/ForgetPassword";
+import { GradePapers } from "./pages/GradePapers";
+import { Login } from "./pages/Login";
+import { MyPage } from "./pages/MyPage";
+import { PracticePapers } from "./pages/PracticePapers";
+import { Privacy } from "./pages/Privacy";
 import ResetPassword from "./pages/ResetPassword";
+import { Terms } from "./pages/Terms";
+import UploadPapers from "./pages/UploadPapers";
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
@@ -62,6 +63,8 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50 flex flex-col">
+        {/* ToastContainer renders toast notifications globally */}
+        <ToastContainer />
         <Header />
         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>

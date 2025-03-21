@@ -1,97 +1,84 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useEffect } from "react";
+// pages/GradePapers.tsx
+import { Save } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import { HotToast } from "../components/Toaster";
+import { Button } from "../components/ui/Button";
+import { Message } from "../components/ui/Message";
+import { DateSelector } from "../features/grade/components/DateSelector";
+import { GradeGrid } from "../features/grade/components/GradeGrid";
 import { useAuth } from "../hooks/useAuth";
-import { supabase } from "../lib/supabase";
-import {
-  Save,
-  Calendar,
-  Circle,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { usePapers } from "../hooks/usePapers";
 
-interface Paper {
-  id: string;
-  file_path: string;
-  tags: string[];
-  is_correct: boolean;
-  last_practiced: string | null;
-  next_practice_date: string | null;
-  created_at: string;
-  user_id: string;
-}
-
+/**
+ * ペーパー採点ページ
+ */
 export const GradePapers: React.FC = () => {
   const { user } = useAuth();
-  const [papers, setPapers] = useState<Paper[]>([]);
-  const [selectedPapers, setSelectedPapers] = useState(new Set<string>());
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const {
+    papers,
+    loading,
+    loadPapersByDate,
+    gradePapers
+  } = usePapers();
+
   const [selectedDate, setSelectedDate] = useState(
-    () => new Date().toISOString().split("T")[0]
+    () => new Date().toISOString().split('T')[0]
   );
+  const [grades, setGrades] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
+  // 選択された日付のペーパーを読み込む
   useEffect(() => {
-    if (!user) return;
+    if (user) {
+      loadPapersByDate(selectedDate);
+      setGrades({}); // 日付が変わったら採点状態をリセット
+    }
+  }, [user, selectedDate, loadPapersByDate]);
 
-    const fetchPapers = async () => {
-      setLoading(true);
-      try {
-        const startDate = new Date(selectedDate);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(selectedDate);
-        endDate.setHours(23, 59, 59, 999);
+  /**
+   * 前の日に移動
+   */
+  const goToPrevDate = useCallback(() => {
+    setSelectedDate(prevDate => {
+      const date = new Date(prevDate);
+      date.setDate(date.getDate() - 1);
+      return date.toISOString().split('T')[0];
+    });
+  }, []);
 
-        const { data, error } = await supabase
-          .from("papers")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("created_at", startDate.toISOString())
-          .lte("created_at", endDate.toISOString())
-          .order("created_at", { ascending: true });
+  /**
+   * 次の日に移動
+   */
+  const goToNextDate = useCallback(() => {
+    setSelectedDate(prevDate => {
+      const date = new Date(prevDate);
+      date.setDate(date.getDate() + 1);
+      return date.toISOString().split('T')[0];
+    });
+  }, []);
 
-        if (error) throw error;
+  /**
+   * 採点状態の変更
+   */
+  const handleGradeChange = useCallback((paperId: string, isCorrect: boolean) => {
+    setGrades(prev => ({
+      ...prev,
+      [paperId]: isCorrect
+    }));
+  }, []);
 
-        setPapers(data || []);
-        setSelectedPapers(new Set()); // Reset selection when date changes
-      } catch (err: any) {
-        setMessage({ type: "error", text: err.message });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPapers();
-  }, [user, selectedDate]);
-
-  const calculateNextReviewDate = (
-    isCorrect: boolean,
-    lastPracticed: string | null
-  ): string | null => {
-    if (isCorrect) return null;
-
-    const now = new Date();
-    const last = lastPracticed ? new Date(lastPracticed) : now;
-    const daysSinceLastPractice = Math.floor(
-      (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    const daysToAdd =
-      daysSinceLastPractice >= 30 ? 30 : daysSinceLastPractice >= 7 ? 7 : 3;
-    now.setDate(now.getDate() + daysToAdd);
-
-    return now.toISOString();
-  };
-
+  /**
+   * 採点結果の保存
+   */
   const handleSave = async () => {
-    if (!user) {
-      setMessage({ type: "error", text: "ログインが必要です" });
+    // 採点されたペーパーがない場合
+    const gradedPaperIds = Object.keys(grades);
+    if (gradedPaperIds.length === 0) {
+      HotToast.error('採点されたペーパーがありません');
       return;
     }
 
@@ -99,64 +86,37 @@ export const GradePapers: React.FC = () => {
     setMessage(null);
 
     try {
-      const now = new Date().toISOString();
-      const updates = papers.map((paper) => ({
-        id: paper.id,
-        is_correct: selectedPapers.has(paper.id),
-        last_practiced: now,
-        next_practice_date: calculateNextReviewDate(
-          selectedPapers.has(paper.id),
-          paper.last_practiced
-        ),
+      // 採点データを準備
+      const paperGrades = gradedPaperIds.map(paperId => ({
+        paper_id: paperId,
+        is_correct: grades[paperId],
+        graded_at: new Date().toISOString() // Add the current timestamp
       }));
 
-      // Batch update papers
-      const { error: updateError } = await supabase
-        .from("papers")
-        // @ts-ignore
-        .upsert(updates, { onConflict: ["id"] });
+      // 採点結果を保存
+      await gradePapers(paperGrades);
 
-      if (updateError) throw updateError;
+      // 成功メッセージ
+      setMessage({
+        type: "success",
+        text: `${paperGrades.length}件の採点結果を保存しました`
+      });
 
-      // Batch insert grades
-      const grades = updates.map(({ id, is_correct }) => ({
-        paper_id: id,
-        user_id: user.id,
-        is_correct,
-        graded_at: now,
-      }));
+      // 採点状態をリセット
+      setGrades({});
 
-      const { error: gradeError } = await supabase
-        .from("paper_grades")
-        .insert(grades);
+      HotToast.success('採点結果を保存しました');
+    } catch (error) {
+      console.error('Error saving grades:', error);
+      setMessage({
+        type: "error",
+        text: '採点結果の保存中にエラーが発生しました'
+      });
 
-      if (gradeError) throw gradeError;
-
-      setMessage({ type: "success", text: "採点結果を保存しました" });
-      setSelectedPapers(new Set());
-
-      // Refresh paper list
-      const { data: updatedPapers, error: fetchError } = await supabase
-        .from("papers")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (fetchError) throw fetchError;
-      setPapers(updatedPapers || []);
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message });
+      HotToast.error('採点結果の保存に失敗しました');
     } finally {
       setSaving(false);
     }
-  };
-
-  const changeDate = (days: number) => {
-    setSelectedDate((prevDate) => {
-      const newDate = new Date(prevDate);
-      newDate.setDate(newDate.getDate() + days);
-      return newDate.toISOString().split("T")[0];
-    });
   };
 
   return (
@@ -171,79 +131,40 @@ export const GradePapers: React.FC = () => {
       </div>
 
       {message && (
-        <div
-          className={`p-4 rounded-md mb-6 ${
-            message.type === "success"
-              ? "bg-green-50 text-green-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {message.text}
+        <div className="mb-6">
+          <Message type={message.type}>
+            {message.text}
+          </Message>
         </div>
       )}
 
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         {/* 日付選択 */}
-        <div className="flex items-center justify-center space-x-4 mb-6">
-          <button
-            onClick={() => changeDate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
+        <DateSelector
+          selectedDate={selectedDate}
+          onChange={setSelectedDate}
+          onPrevDate={goToPrevDate}
+          onNextDate={goToNextDate}
+        />
 
-          <div className="flex items-center space-x-2">
-            <Calendar className="w-5 h-5 text-gray-600" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <button
-            onClick={() => changeDate(1)}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <ChevronRight className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-
-        <button
+        <Button
+          variant="primary"
+          icon={Save}
           onClick={handleSave}
-          disabled={saving || papers.length === 0}
-          className="inline-flex items-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+          disabled={saving || Object.keys(grades).length === 0}
+          isLoading={saving}
         >
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "保存中..." : "丸付け結果を保存"}
-        </button>
+          丸付け結果を保存
+        </Button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {loading ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            読み込み中...
-          </div>
-        ) : papers.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            この日の問題は見つかりませんでした
-          </div>
-        ) : (
-          papers.map((paper) => (
-            <div
-              key={paper.id}
-              className="bg-white rounded-lg shadow-sm overflow-hidden"
-            >
-              <img
-                src={paper.file_path}
-                alt="問題"
-                className="w-full h-auto rounded"
-              />
-            </div>
-          ))
-        )}
-      </div>
+      <GradeGrid
+        papers={papers}
+        grades={grades}
+        onGradeChange={handleGradeChange}
+        loading={loading}
+        emptyMessage="この日の問題は見つかりませんでした"
+      />
     </div>
   );
 };
