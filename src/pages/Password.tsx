@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable no-control-regex */
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
+import toast from "react-hot-toast";
 
 export const Password: React.FC = () => {
   const { user } = useAuth();
@@ -29,7 +30,6 @@ export const Password: React.FC = () => {
     };
   }, [password]);
 
-  // Submit Handler
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -62,15 +62,15 @@ export const Password: React.FC = () => {
 
       try {
         const { error } = await supabase.auth.updateUser({ password });
-        if (error) throw error;
+        if (error) throw error; // If there's an error, stop execution
 
         setMessage("パスワードを更新しました");
         setPassword("");
         setConfirmPassword("");
         setPasswordTouched(false);
         setConfirmPasswordTouched(false);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
+        toast.error(`❌ エラー: ${error.message}`);
         setMessage(`エラー: ${error.message}`);
       } finally {
         setLoading(false);
@@ -78,6 +78,19 @@ export const Password: React.FC = () => {
     },
     [password, confirmPassword, validation]
   );
+
+  // 🔥 Listen for password update success
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "USER_UPDATED") {
+        toast.success("✅ パスワードが更新されました");
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="p-6">
