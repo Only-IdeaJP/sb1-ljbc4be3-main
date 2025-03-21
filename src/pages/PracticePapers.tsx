@@ -1,46 +1,68 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useEffect, useCallback } from "react";
+
+// pages/PracticePapers.tsx
+import { Filter, Printer, RefreshCcw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { HotToast } from "../components/Toaster";
+import { Button } from "../components/ui/Button";
+import { PageCounter } from "../features/practice/components/PageCounter";
+import { PaperGrid } from "../features/practice/components/PaperGrid";
+import { PracticePrintView } from "../features/practice/components/PracticePrintView";
+import { TagCount, TagFilter } from "../features/practice/components/TagFilter";
 import { useAuth } from "../hooks/useAuth";
-import { supabase } from "../lib/supabase";
-import {
-  Printer,
-  Filter,
-  RefreshCcw,
-  Tag as TagIcon,
-  Hash,
-  Trash2,
-} from "lucide-react";
-import { DEFAULT_TAGS } from "../../constant/Constant";
+import { usePapers } from "../hooks/usePapers";
 
-interface Paper {
-  id: string;
-  file_path: string;
-  tags: string[];
-  is_correct: boolean;
-  last_practiced: string | null;
-  next_practice_date: string | null;
-}
-
+/**
+ * ペーパー演習ページ
+ */
 export const PracticePapers: React.FC = () => {
   const { user } = useAuth();
-  const [papers, setPapers] = useState<Paper[]>([]);
-  const [selectedPapers, setSelectedPapers] = useState<Paper[]>([]);
-  const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(
-    new Set()
-  );
-  const [pageCount, setPageCount] = useState(20);
-  const [loading, setLoading] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<{ [key: string]: number }>(
-    {}
-  );
-  const [availableTags, setAvailableTags] = useState<
-    { tag: string; count: number }[]
-  >([]);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    papers,
+    selectedPapers,
+    loading,
+    loadPapers,
+    searchPapers,
+    toggleSelection,
+    deselectAll,
+    deleteSelectedPapers
+  } = usePapers();
 
-  // Memoize shuffle function to avoid re-creating it on every render
+  const [pageCount, setPageCount] = useState(20);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Record<string, number>>({});
+  const [availableTags, setAvailableTags] = useState<TagCount[]>([]);
+  const [generatedPapers, setGeneratedPapers] = useState(papers);
+
+  // 初期データの読み込み
+  useEffect(() => {
+    if (user) {
+      loadPapers();
+    }
+  }, [user, loadPapers]);
+
+  // 利用可能なタグの集計
+  useEffect(() => {
+    if (papers.length > 0) {
+      const tagCounts: Record<string, number> = {};
+
+      papers.forEach(paper => {
+        paper.tags.forEach(tag => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      });
+
+      const tags = Object.entries(tagCounts).map(([tag, count]) => ({
+        tag,
+        count
+      }));
+
+      setAvailableTags(tags);
+    }
+  }, [papers]);
+
+  /**
+   * 問題のシャッフル
+   */
   const shuffleArray = useCallback(<T,>(array: T[]): T[] => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -50,71 +72,69 @@ export const PracticePapers: React.FC = () => {
     return newArray;
   }, []);
 
-  useEffect(() => {
-    const fetchPapers = async () => {
-      if (!user) return;
-      setLoading(true);
-      try {
-        const now = new Date().toISOString();
-        const { data, error } = await supabase
-          .from("papers")
-          .select("*")
-          .eq("user_id", user.id)
-          .or(`is_correct.eq.false,next_practice_date.lte.${now}`);
-
-        if (error) throw error;
-
-        setPapers(data || []);
-
-        const tagCounts: { [key: string]: number } = {};
-        data?.forEach((paper) => {
-          paper.tags?.forEach((tag: string | number) => {
-            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-          });
-        });
-
-        setAvailableTags(
-          DEFAULT_TAGS.map((tag) => ({
-            tag,
-            count: tagCounts[tag] || 0,
-          }))
-        );
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPapers();
-  }, [user]);
-
-  const selectPapers = useCallback(() => {
+  /**
+   * 問題生成処理
+   */
+  const generatePapers = useCallback(() => {
     let selectedPaperPool = [...papers];
-    let result: Paper[] = [];
+    let result: typeof papers = [];
 
     if (Object.keys(selectedTags).length > 0) {
+      // タグ選択がある場合は、選択されたタグに基づいて問題を選択
       Object.entries(selectedTags).forEach(([tag, count]) => {
-        const tagPapers = selectedPaperPool.filter((p) => p.tags.includes(tag));
-        const randomTagPapers = shuffleArray(tagPapers).slice(0, count);
-        result = [...result, ...randomTagPapers];
-        selectedPaperPool = selectedPaperPool.filter(
-          (p) => !randomTagPapers.includes(p)
-        );
+        if (count > 0) {
+          const tagPapers = selectedPaperPool.filter(p => p.tags.includes(tag));
+          const randomTagPapers = shuffleArray(tagPapers).slice(0, count);
+          result = [...result, ...randomTagPapers];
+
+          // すでに選択した問題を除外
+          selectedPaperPool = selectedPaperPool.filter(
+            p => !randomTagPapers.includes(p)
+          );
+        }
       });
     } else {
+      // タグ選択がない場合は、ページ数に基づいてランダムに選択
       result = shuffleArray(selectedPaperPool).slice(0, pageCount);
     }
 
-    setSelectedPapers(result);
-    setSelectedForRemoval(new Set());
-  }, [papers, selectedTags, pageCount, shuffleArray]);
+    setGeneratedPapers(result);
+    deselectAll(); // 選択をクリア
 
-  const handleRemoveSelected = () => {
-    setSelectedPapers((prev) =>
-      prev.filter((paper) => !selectedForRemoval.has(paper.id))
-    );
-    setSelectedForRemoval(new Set());
+    HotToast.success(`${result.length}件の問題を生成しました`);
+  }, [papers, selectedTags, pageCount, shuffleArray, deselectAll]);
+
+  /**
+   * 選択された問題の削除処理
+   */
+  const handleRemoveSelected = async () => {
+    if (selectedPapers.size === 0) return;
+
+    const count = selectedPapers.size;
+    if (!window.confirm(`選択した${count}件の問題を削除してもよろしいですか？`)) {
+      return;
+    }
+
+    try {
+      await deleteSelectedPapers();
+
+      // 生成済みの問題リストからも削除
+      setGeneratedPapers(prev =>
+        prev.filter(p => !selectedPapers.has(p.id))
+      );
+
+      HotToast.success(`${count}件の問題を削除しました`);
+    } catch (error) {
+      console.error('Error removing selected papers:', error);
+      HotToast.error('問題の削除中にエラーが発生しました');
+    }
+  };
+
+  /**
+   * 印刷処理
+   */
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -129,180 +149,74 @@ export const PracticePapers: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6 no-print">
         <div className="flex flex-wrap items-center gap-4 mb-6">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              ページ数
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={pageCount}
-              onChange={(e) =>
-                setPageCount(Math.max(1, parseInt(e.target.value) || 1))
-              }
-              className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            <PageCounter
+              count={pageCount}
+              onChange={setPageCount}
             />
           </div>
 
-          <button
+          <Button
+            variant="outline"
+            icon={Filter}
             onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >
-            <Filter className="h-4 w-4 mr-2" />
             フィルター
-          </button>
+          </Button>
         </div>
 
         {showFilters && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">
-                タグ別の出題数
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {availableTags.map(({ tag, count }) => (
-                  <div key={tag} className="flex items-center space-x-2">
-                    <label className="flex-1 text-sm text-gray-700">
-                      {tag} ({count}問)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={count}
-                      value={selectedTags[tag] || 0}
-                      onChange={(e) => {
-                        const value = Math.max(
-                          0,
-                          Math.min(count, parseInt(e.target.value) || 0)
-                        );
-                        setSelectedTags((prev) => ({
-                          ...prev,
-                          [tag]: value,
-                        }));
-                      }}
-                      className="w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="mb-6">
+            <TagFilter
+              tags={availableTags}
+              selectedTags={selectedTags}
+              onChange={setSelectedTags}
+            />
           </div>
         )}
 
         <div className="flex flex-wrap gap-4">
-          <button
-            onClick={selectPapers}
-            disabled={loading}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          <Button
+            variant="primary"
+            icon={RefreshCcw}
+            onClick={generatePapers}
+            disabled={loading || papers.length === 0}
           >
-            <RefreshCcw className="h-4 w-4 mr-2" />
             問題を生成
-          </button>
+          </Button>
 
-          {selectedPapers.length > 0 && (
+          {generatedPapers.length > 0 && (
             <>
-              <button
-                onClick={() => window.print()}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              <Button
+                variant="success"
+                icon={Printer}
+                onClick={handlePrint}
               >
-                <Printer className="h-4 w-4 mr-2" />
                 印刷する
-              </button>
+              </Button>
 
-              {selectedForRemoval.size > 0 && (
-                <button
+              {selectedPapers.size > 0 && (
+                <Button
+                  variant="danger"
+                  icon={Trash2}
                   onClick={handleRemoveSelected}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
                   選択した問題を削除
-                </button>
+                </Button>
               )}
             </>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 no-print">
-        {loading ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            読み込み中...
-          </div>
-        ) : selectedPapers.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            問題が見つかりませんでした
-          </div>
-        ) : (
-          selectedPapers.map((paper, index) => (
-            <div
-              key={paper.id}
-              className="bg-white rounded-lg shadow-sm overflow-hidden"
-            >
-              <div className="p-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-1 bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs font-medium">
-                    <Hash className="w-3 h-3" />
-                    <span>問題 {index + 1}</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={selectedForRemoval.has(paper.id)}
-                    onChange={() => {
-                      setSelectedForRemoval((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(paper.id)) {
-                          next.delete(paper.id);
-                        } else {
-                          next.add(paper.id);
-                        }
-                        return next;
-                      });
-                    }}
-                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded cursor-pointer"
-                  />
-                </div>
+      <PaperGrid
+        papers={generatedPapers}
+        selectedPapers={selectedPapers}
+        toggleSelection={toggleSelection}
+        loading={loading}
+        emptyMessage="問題が見つかりませんでした。「問題を生成」をクリックして問題を作成してください。"
+      />
 
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {paper.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="w-full aspect-square rounded-lg overflow-hidden">
-                  <img
-                    src={paper.file_path}
-                    alt={`問題 ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="hidden print:block print-content">
-        {selectedPapers.map((paper, index) => (
-          <div key={paper.id} className="print-paper">
-            <div className="mb-4">
-              <div className="text-xl font-bold">問題 {index + 1}</div>
-              <div className="text-sm text-gray-600 mt-1">
-                {paper.tags.join(" / ")}
-              </div>
-            </div>
-            <img
-              src={paper.file_path}
-              alt={`問題 ${index + 1}`}
-              className="w-full h-auto max-h-[80vh]"
-              style={{ pageBreakInside: "avoid" }}
-            />
-          </div>
-        ))}
-      </div>
+      <PracticePrintView papers={generatedPapers} />
     </div>
   );
 };
