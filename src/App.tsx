@@ -1,4 +1,6 @@
-import React from "react";
+// App.tsx
+
+import React, { useEffect } from "react";
 import {
   Navigate,
   Route,
@@ -10,10 +12,12 @@ import Header from "./components/common/Header";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ToastContainer } from "./components/Toaster";
 import { useAuth } from "./hooks/useAuth";
+import { supabase } from "./lib/supabase";
 import { AllPages } from "./pages/AllPages";
 import { Commerce } from "./pages/Commerce";
 import { Contact } from "./pages/Contact";
 import { Dashboard } from "./pages/Dashboard";
+import { EmailConfirmation, EmailConfirmSuccess } from "./pages/EmailConfirmation";
 import { FAQ } from "./pages/FAQ";
 import { Features } from "./pages/Features";
 import ForgetPassword from "./pages/ForgetPassword";
@@ -28,6 +32,50 @@ import UploadPapers from "./pages/UploadPapers";
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
+
+  // Supabaseのハッシュパラメータを処理
+  useEffect(() => {
+    // URLからハッシュパラメータを取得
+    const handleEmailConfirmation = async () => {
+      const { hash } = window.location;
+      if (hash && hash.includes('type=signup')) {
+        try {
+          // セッションを取得
+          const { data, error } = await supabase.auth.getSession();
+
+          if (error) {
+            console.error('Session error:', error);
+            return;
+          }
+
+          // ユーザーが認証されていればメール確認成功とみなす
+          if (data.session) {
+            // メール確認フラグを更新
+            const { error: updateError } = await supabase
+              .from('users')
+              .update({ email_confirmed: true })
+              .eq('id', data.session.user.id);
+
+            if (updateError) {
+              console.error('Error updating email confirmation:', updateError);
+              return;
+            }
+
+            // 成功したら確認完了ページにリダイレクト（URLハッシュをクリア）
+            // 一時的にログアウトして状態をクリアする
+            await supabase.auth.signOut();
+
+            // ハッシュを削除して確認成功ページに移動
+            window.location.href = '/confirm-success';
+          }
+        } catch (error) {
+          console.error('Email confirmation error:', error);
+        }
+      }
+    };
+
+    handleEmailConfirmation();
+  }, []);
 
   // Show loading spinner while checking auth status
   if (loading) {
@@ -50,6 +98,9 @@ const App: React.FC = () => {
     { path: "/", element: <Dashboard /> },
     { path: "/forget-password", element: <ForgetPassword /> },
     { path: "/reset-password", element: <ResetPassword /> },
+    // メール確認関連の新しいルート
+    { path: "/email-confirmation", element: <EmailConfirmation /> },
+    { path: "/confirm-success", element: <EmailConfirmSuccess /> },
   ];
 
   const protectedRoutes = [

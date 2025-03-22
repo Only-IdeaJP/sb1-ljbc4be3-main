@@ -1,7 +1,8 @@
-
 // pages/Login.tsx
-import React, { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+
+import React, { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { HotToast } from '../components/Toaster';
 import { LoginForm } from '../features/auth/components/LoginForm';
 import { RegisterForm } from '../features/auth/components/RegisterForm';
 import { useAuth } from '../hooks/useAuth';
@@ -12,6 +13,29 @@ import { useAuth } from '../hooks/useAuth';
 export const Login: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  // クエリパラメータを確認
+  useEffect(() => {
+    // URLのクエリパラメータを解析
+    const params = new URLSearchParams(location.search);
+
+    // 確認メール送信後のリダイレクトを確認
+    if (params.get('email_confirmed') === 'true') {
+      HotToast.success('メールアドレスが確認されました。ログインしてください。');
+    }
+
+    // メール確認待ちの場合
+    if (params.get('email_sent') === 'true') {
+      HotToast.info('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。');
+    }
+
+    // エラーがある場合
+    const errorParam = params.get('error');
+    if (errorParam) {
+      HotToast.error(decodeURIComponent(errorParam));
+    }
+  }, [location]);
 
   // すでにログインしている場合はダッシュボードにリダイレクト
   if (isAuthenticated) {
@@ -20,11 +44,6 @@ export const Login: React.FC = () => {
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
-  };
-
-  const handleRegistrationComplete = () => {
-    // 登録完了後、ログインフォームに切り替える
-    setIsLogin(true);
   };
 
   return (
@@ -46,9 +65,9 @@ export const Login: React.FC = () => {
         {isLogin ? (
           <LoginForm onToggleForm={toggleForm} />
         ) : (
-          <RegisterForm onToggleForm={toggleForm} onComplete={handleRegistrationComplete} />
+          <RegisterForm onToggleForm={toggleForm} />
         )}
       </div>
     </div>
   );
-}
+};

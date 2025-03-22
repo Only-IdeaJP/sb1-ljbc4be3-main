@@ -1,7 +1,8 @@
-
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+// pages/Profile.tsx
+import React, { useEffect, useState } from 'react';
+import { ChildBirthSelector } from '../components/form/ChildBirthSelector';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 
 export const Profile: React.FC = () => {
   const { user } = useAuth();
@@ -9,11 +10,11 @@ export const Profile: React.FC = () => {
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState({
     email: '',
-    child_birth_year: '',
-    child_birth_month: '',
+    child_birth_year: null as number | null,
+    child_birth_month: null as number | null,
   });
 
-  // Function to fetch user profile
+  // プロフィール情報を取得する関数
   const fetchProfile = async () => {
     if (!user) return;
     try {
@@ -24,22 +25,34 @@ export const Profile: React.FC = () => {
         .single();
 
       if (error) throw error;
-      setProfile(data || {});
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+      // データがnullの場合の対応
+      setProfile({
+        email: data?.email || '',
+        child_birth_year: data?.child_birth_year || null,
+        child_birth_month: data?.child_birth_month || null,
+      });
     } catch (error: any) {
-      console.error('Error loading profile:', error.message);
+      console.error('プロフィール情報の読み込みエラー:', error.message);
     }
   };
 
-  // Fetch profile on component mount
+  // コンポーネントマウント時にプロフィール情報を取得
   useEffect(() => {
     fetchProfile();
   }, [user]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setProfile(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  // 年の変更ハンドラ
+  const handleYearChange = (year: number | null) => {
+    setProfile(prev => ({ ...prev, child_birth_year: year }));
   };
 
+  // 月の変更ハンドラ
+  const handleMonthChange = (month: number | null) => {
+    setProfile(prev => ({ ...prev, child_birth_month: month }));
+  };
+
+  // フォーム送信ハンドラ
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id) return;
@@ -60,8 +73,7 @@ export const Profile: React.FC = () => {
       if (error) throw error;
 
       setMessage('プロフィールを更新しました');
-      await fetchProfile(); // ✅ Refetch data to get latest values
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await fetchProfile(); // 最新の値を再取得
     } catch (error: any) {
       setMessage(`エラー: ${error.message}`);
     } finally {
@@ -80,7 +92,7 @@ export const Profile: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Email Field */}
+        {/* メールアドレス（変更不可） */}
         <div>
           <label className="block text-sm font-medium text-gray-700">メールアドレス</label>
           <input
@@ -92,40 +104,15 @@ export const Profile: React.FC = () => {
           <p className="mt-1 text-sm text-gray-500">メールアドレスは変更できません</p>
         </div>
 
-        {/* Birth Year & Month Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">お子様の生年月</label>
-          <div className="mt-1 grid grid-cols-2 gap-4">
-            <select
-              name="child_birth_year"
-              value={profile.child_birth_year}
-              onChange={handleChange}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-              <option value="">年を選択</option>
-              {Array.from({ length: 20 }, (_, i) => (
-                <option key={i} value={new Date().getFullYear() - i}>
-                  {new Date().getFullYear() - i}年
-                </option>
-              ))}
-            </select>
-            <select
-              name="child_birth_month"
-              value={profile.child_birth_month}
-              onChange={handleChange}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-              <option value="">月を選択</option>
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i} value={String(i + 1).padStart(2, '0')}>
-                  {i + 1}月
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        {/* お子様の生年月選択 */}
+        <ChildBirthSelector
+          birthYear={profile.child_birth_year}
+          birthMonth={profile.child_birth_month}
+          onYearChange={handleYearChange}
+          onMonthChange={handleMonthChange}
+        />
 
-        {/* Submit Button */}
+        {/* 送信ボタン */}
         <div className="flex justify-end">
           <button
             type="submit"

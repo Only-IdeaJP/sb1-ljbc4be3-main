@@ -1,7 +1,7 @@
 // features/auth/components/LoginForm.tsx
-import { Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { AuthService } from '../../../services/auth.service';
 
@@ -26,11 +26,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
     const [loading, setLoading] = useState(false);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [isEmailConfirmationError, setIsEmailConfirmationError] = useState(false);
 
     // フォームデータが変更されたときにエラーをクリア
     useEffect(() => {
         setValidationErrors([]);
         setError(null);
+        setIsEmailConfirmationError(false);
     }, [formData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,7 +57,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
             navigate('/');
         } catch (err) {
             console.error('Login error:', err);
-            setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
+            const errorMessage = err instanceof Error ? err.message : '予期せぬエラーが発生しました';
+
+            // メール確認エラーを検出
+            if (errorMessage.includes('メールアドレスの確認が完了していません')) {
+                setIsEmailConfirmationError(true);
+            }
+
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -63,8 +72,30 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
 
     return (
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            {/* エラーメッセージ表示 */}
-            {(validationErrors.length > 0 || error) && (
+            {/* メール確認エラーメッセージ */}
+            {isEmailConfirmationError && (
+                <div className="bg-yellow-50 text-yellow-800 p-4 rounded-md border border-yellow-200 flex items-start">
+                    <AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-2">
+                        <p>メールアドレスの確認が完了していません。</p>
+                        <p className="text-sm">
+                            登録時に送信された確認メールのリンクをクリックして、アカウント登録を完了してください。
+                            確認メールが見つからない場合は、迷惑メールフォルダをご確認ください。
+                        </p>
+                        <div>
+                            <Link
+                                to="/email-confirmation"
+                                className="text-sm text-indigo-600 hover:text-indigo-500 font-medium"
+                            >
+                                確認メールについての詳細はこちら
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 一般的なエラーメッセージ表示 */}
+            {(validationErrors.length > 0 || (error && !isEmailConfirmationError)) && (
                 <div className="bg-red-50 text-red-700 p-4 rounded-md">
                     {validationErrors.length > 0 ? (
                         <ul className="list-disc pl-5">
@@ -150,6 +181,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
                             ログイン状態を保持する
                         </label>
                     </div>
+                    <div className="text-sm">
+                        <Link to="/forget-password" className="text-indigo-600 hover:text-indigo-500">
+                            パスワードをお忘れですか？
+                        </Link>
+                    </div>
                 </div>
 
                 {/* ログインボタン */}
@@ -177,4 +213,3 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         </form>
     );
 };
-
