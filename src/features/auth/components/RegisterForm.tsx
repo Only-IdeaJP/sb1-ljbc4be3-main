@@ -1,27 +1,29 @@
 // features/auth/components/RegisterForm.tsx
+
 import { Eye, EyeOff } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ChildBirthSelector } from '../../../components/form/ChildBirthSelector';
 import { useAuth } from '../../../hooks/useAuth';
 import { AuthService } from '../../../services/auth.service';
-
 interface RegisterFormProps {
     onToggleForm: () => void;
-    onComplete: () => void;
 }
 
 /**
  * 新規ユーザー登録フォームコンポーネント
  */
-export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm, onComplete }) => {
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
     const { signUp } = useAuth();
+    const navigate = useNavigate();
 
     // フォーム状態
     const [formData, setFormData] = useState({
         email: '',
         password: '',
         confirmPassword: '',
-        child_birth_year: '',
-        child_birth_month: ''
+        child_birth_year: null as number | null,
+        child_birth_month: null as number | null
     });
     const [agreeToTerms, setAgreeToTerms] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -39,6 +41,16 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm, onComp
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    // 年の変更ハンドラ
+    const handleYearChange = (year: number | null) => {
+        setFormData(prev => ({ ...prev, child_birth_year: year }));
+    };
+
+    // 月の変更ハンドラ
+    const handleMonthChange = (month: number | null) => {
+        setFormData(prev => ({ ...prev, child_birth_month: month }));
     };
 
     const validateForm = (): string[] => {
@@ -91,8 +103,11 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm, onComp
                 }
             );
 
-            // 登録成功
-            onComplete();
+            // メールアドレスをローカルストレージに保存（メール再送信用）
+            localStorage.setItem('pending_email', formData.email);
+
+            // 登録成功後、確認メールページにリダイレクト
+            navigate('/email-confirmation');
         } catch (err) {
             console.error('Registration error:', err);
             setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
@@ -206,43 +221,12 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm, onComp
                 </div>
 
                 {/* お子様の生年 */}
-                <div>
-                    <label
-                        htmlFor="child_birth_year"
-                        className="block text-sm font-medium text-gray-700"
-                    >
-                        お子様の生年
-                    </label>
-                    <input
-                        id="child_birth_year"
-                        name="child_birth_year"
-                        type="text"
-                        value={formData.child_birth_year}
-                        onChange={handleChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        placeholder="例：2020"
-                    />
-                </div>
-
-                {/* お子様の生月 */}
-                <div>
-                    <label
-                        htmlFor="child_birth_month"
-                        className="block text-sm font-medium text-gray-700"
-                    >
-                        お子様の生月
-                    </label>
-                    <input
-                        id="child_birth_month"
-                        name="child_birth_month"
-                        type="text"
-                        value={formData.child_birth_month}
-                        onChange={handleChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        placeholder="例：5"
-                    />
-                </div>
-
+                <ChildBirthSelector
+                    birthYear={formData.child_birth_year}
+                    birthMonth={formData.child_birth_month}
+                    onYearChange={handleYearChange}
+                    onMonthChange={handleMonthChange}
+                />
                 {/* 利用規約の同意 */}
                 <div className="flex items-center">
                     <input

@@ -30,34 +30,95 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
     /**
      * 認証状態を初期化する
+     * メール確認状態もチェックします
      */
     initialize: async () => {
         set({ loading: true, error: null });
         try {
-            const user = await AuthService.getCurrentUser();
-            set({ user, loading: false });
+            // Supabaseから認証状態を取得
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+            if (sessionError) {
+                throw sessionError;
+            }
+
+            if (sessionData.session) {
+                const userId = sessionData.session.user.id;
+
+                // データベースからメール確認状態を取得
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', userId)
+                    .eq('is_withdrawn', false)
+                    .single();
+
+                if (userError) {
+                    throw userError;
+                }
+
+                // メール確認状態をチェック
+                if (!userData || !userData.email_confirmed) {
+                    // メール未確認の場合はログアウト
+                    await supabase.auth.signOut();
+                    set({
+                        user: null,
+                        loading: false,
+                        error: 'メールアドレスの確認が完了していません。メールの確認リンクをクリックしてください。'
+                    });
+                    return;
+                }
+
+                // すべての条件をクリアしたらユーザーを設定
+                set({ user: userData as User, loading: false });
+            } else {
+                set({ user: null, loading: false });
+            }
 
             // 認証状態の変更を監視
             supabase.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
                     if (session) {
-                        const currentUser = await AuthService.getCurrentUser();
-                        set({ user: currentUser });
+                        try {
+                            // データベースからユーザー情報を取得
+                            const { data: userData, error: userError } = await supabase
+                                .from('users')
+                                .select('*')
+                                .eq('id', session.user.id)
+                                .eq('is_withdrawn', false)
+                                .single();
+
+                            if (userError) throw userError;
+
+                            // メール確認状態をチェック
+                            if (!userData || !userData.email_confirmed) {
+                                // メール未確認の場合はログアウト
+                                await supabase.auth.signOut();
+                                set({
+                                    user: null,
+                                    error: 'メールアドレスの確認が完了していません。メールの確認リンクをクリックしてください。'
+                                });
+                                return;
+                            }
+
+                            set({ user: userData as User });
+                        } catch (error) {
+                            console.error('User data fetch error:', error);
+                            await supabase.auth.signOut();
+                            set({ user: null });
+                        }
                     }
                 } else if (event === 'SIGNED_OUT') {
                     set({ user: null });
                 }
             });
 
-            // No return statement here since we must resolve as Promise<void>
-            // If you want a cleanup function, store the subscription somewhere
-            // and unsubscribe it manually later when needed.
-
         } catch (error) {
             console.error('Auth initialization error:', error);
             set({
                 error: error instanceof Error ? error.message : '認証エラーが発生しました',
-                loading: false
+                loading: false,
+                user: null
             });
         }
     },
@@ -69,7 +130,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
     signIn: async (credentials) => {
         set({ loading: true, error: null });
         try {
-            const user = await AuthService.signIn(credentials);
+            // メール確認済みチェック付きのログイン処理
+            const user = await AuthService.signInWithEmailConfirmation(credentials);
             set({ user, loading: false });
         } catch (error) {
             console.error('Sign in error:', error);
@@ -89,8 +151,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
     signUp: async (data) => {
         set({ loading: true, error: null });
         try {
-            const user = await AuthService.signUp(data);
-            set({ user, loading: false });
+            // メール確認ありのサインアップ処理
+            await AuthService.signUpWithEmailConfirmation(data);
+            // メール確認待ちの状態なので、ユーザーはnullのまま
+            set({ loading: false, user: null });
         } catch (error) {
             console.error('Sign up error:', error);
             set({
