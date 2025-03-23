@@ -7,9 +7,9 @@ import {
   Upload
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useDropzone } from "react-dropzone"; // npm install react-dropzone
+import { useDropzone } from "react-dropzone";
 import { useNavigate } from "react-router-dom";
-import { v4 as uuidv4 } from "uuid"; // npm install uuid @types/uuid
+import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_TAGS } from "../../constant/Constant";
 import { HotToast } from "../components/Toaster";
 import DraggableTag from "../components/upload/DraggableTag";
@@ -46,7 +46,6 @@ const UploadPapers: React.FC = () => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  // draggedTagsは実際にドラッグ中のタグを追跡し、UIフィードバックに使用
   const [draggedTags, setDraggedTags] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -269,14 +268,11 @@ const UploadPapers: React.FC = () => {
           return {
             ...file,
             pages: file.pages.map(page => {
-              if (page.id === pageId) {
-                // タグが既に存在しない場合のみ追加
-                if (!page.tags.includes(tag)) {
-                  return {
-                    ...page,
-                    tags: [...page.tags, tag]
-                  };
-                }
+              if (page.id === pageId && !page.tags.includes(tag)) {
+                return {
+                  ...page,
+                  tags: [...page.tags, tag]
+                };
               }
               return page;
             })
@@ -312,7 +308,7 @@ const UploadPapers: React.FC = () => {
 
   // タグを全てのページに適用する
   const applyTagToAllPages = useCallback((tag: string) => {
-    if (!confirm(`「${tag}」タグを全てのページに適用しますか？`)) {
+    if (!confirm(`「${tag}」タグを全てのファイルの全ページに適用しますか？`)) {
       return;
     }
 
@@ -327,6 +323,27 @@ const UploadPapers: React.FC = () => {
     );
 
     HotToast.success(`「${tag}」タグを全てのページに適用しました`);
+  }, []);
+
+  // タグを特定のPDFの全ページに適用する
+  const applyTagToPdfAllPages = useCallback((fileId: string, tag: string) => {
+    // 確認不要で適用（既に詳細ビュー内なので）
+    setFiles(prev =>
+      prev.map(file => {
+        if (file.id === fileId) {
+          return {
+            ...file,
+            pages: file.pages.map(page => ({
+              ...page,
+              tags: page.tags.includes(tag) ? page.tags : [...page.tags, tag]
+            }))
+          };
+        }
+        return file;
+      })
+    );
+
+    HotToast.success(`「${tag}」タグをPDFの全ページに適用しました`);
   }, []);
 
   // 全てのタグをすべてのページに適用
@@ -358,13 +375,21 @@ const UploadPapers: React.FC = () => {
   // ドラッグ操作のフィードバック表示
   const handleTagDragStart = useCallback((tag: string) => {
     setDraggedTags([tag]);
-    // ここでドラッグ中のUIフィードバックも設定可能
     document.body.classList.add('tag-dragging');
+  }, []);
+
+  // ドラッグ操作の終了
+  const handleTagDragEnd = useCallback(() => {
+    setDraggedTags([]);
+    document.body.classList.remove('tag-dragging');
   }, []);
 
   // アップロード直後にリソースを解放
   useEffect(() => {
     return () => {
+      // ドラッグ中のクラスを削除
+      document.body.classList.remove('tag-dragging');
+
       // 作成したURL.createObjectURLをクリーンアップ
       files.forEach(file => {
         if (file.previewUrl && file.type === "image") {
@@ -394,8 +419,8 @@ const UploadPapers: React.FC = () => {
       {/* メッセージ表示 */}
       {message && (
         <div className={`p-4 rounded-md mb-6 ${message.type === "success"
-            ? "bg-green-50 text-green-700"
-            : "bg-red-50 text-red-700"
+          ? "bg-green-50 text-green-700"
+          : "bg-red-50 text-red-700"
           }`}>
           <div className="flex items-center">
             {message.type === "success" ? (
@@ -444,6 +469,7 @@ const UploadPapers: React.FC = () => {
                 tag={tag}
                 onClick={() => applyTagToAllPages(tag)}
                 onDragStart={() => handleTagDragStart(tag)}
+                onDragEnd={handleTagDragEnd}
               />
             ))}
           </div>
@@ -486,7 +512,10 @@ const UploadPapers: React.FC = () => {
               <DroppableArea
                 key={file.id}
                 id={file.id}
-                onDrop={(fileId, tag) => applyTagToPage(fileId, file.pages[0].id, tag)}
+                onDrop={(fileId, tag) => {
+                  // PDF/画像共通でドロップ時のタグ適用処理
+                  applyTagToPage(fileId, file.pages[0].id, tag);
+                }}
                 className="relative"
               >
                 <FilePreview
@@ -496,11 +525,13 @@ const UploadPapers: React.FC = () => {
                   fileType={file.type}
                   pageCount={file.pages.length}
                   fileSize={file.file.size}
-                  tags={file.pages[0].tags}
+                  pages={file.pages}
                   uploading={file.uploading}
                   uploaded={file.uploaded}
                   onRemove={removeFile}
-                  onRemoveTag={(fileId, tag) => removeTagFromPage(fileId, file.pages[0].id, tag)}
+                  onRemoveTag={removeTagFromPage}
+                  onApplyTag={applyTagToPage}
+                  onApplyTagToAllPages={applyTagToPdfAllPages} // 特定のPDFの全ページにタグを適用
                   disableControls={isUploading}
                 />
               </DroppableArea>

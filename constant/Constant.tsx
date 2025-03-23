@@ -1,13 +1,13 @@
 import {
-  Upload,
-  Printer,
-  Edit3,
-  RefreshCcw,
-  Lock,
   Brain,
   Clock,
+  Edit3,
+  Lock,
+  Printer,
+  RefreshCcw,
   Shield,
   Sparkles,
+  Upload,
   Users,
 } from "lucide-react";
 
@@ -395,7 +395,8 @@ export const TAG_STYLES: Record<string, string> = {
   論理: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200",
   理科的常識: "bg-cyan-100 text-cyan-800 hover:bg-cyan-200",
   社会的常識: "bg-orange-100 text-orange-800 hover:bg-orange-200",
+  その他: "bg-teal-100 text-teal-800 hover:bg-teal-200",
 };
 
 export const getTagStyle = (tag: string): string =>
-  TAG_STYLES[tag] || "bg-gray-100 text-gray-800 hover:bg-gray-200";
+  TAG_STYLES[tag];

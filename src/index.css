@@ -2,22 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+
+/* タグのスタイリング用のユーティリティクラス */
+.tag {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+}
+
+/* タグの色クラス */
+.tag-算数 {
+  @apply bg-indigo-100 text-indigo-800 border border-indigo-200;
+}
+
+.tag-国語 {
+  @apply bg-red-100 text-red-800 border border-red-200;
+}
+
+.tag-理科 {
+  @apply bg-green-100 text-green-800 border border-green-200;
+}
+
+.tag-社会 {
+  @apply bg-yellow-100 text-yellow-800 border border-yellow-200;
+}
+
+.tag-英語 {
+  @apply bg-blue-100 text-blue-800 border border-blue-200;
+}
+
+.tag-プリント {
+  @apply bg-purple-100 text-purple-800 border border-purple-200;
+}
+
+.tag-テスト {
+  @apply bg-pink-100 text-pink-800 border border-pink-200;
+}
+
+.tag-宿題 {
+  @apply bg-orange-100 text-orange-800 border border-orange-200;
+}
+
+.tag-復習 {
+  @apply bg-teal-100 text-teal-800 border border-teal-200;
+}
+
+.tag-予習 {
+  @apply bg-cyan-100 text-cyan-800 border border-cyan-200;
+}
+
+/* タグドラッグ中のカーソルスタイル */
+body.tag-dragging {
+  cursor: grabbing;
+}
+
+/* タグドロップエリアのスタイル */
+.droppable-active {
+  @apply ring-2 ring-indigo-500 ring-opacity-50;
+}
+
+/* アニメーション */
 @keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
+
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
+/* ドロップメニューのスタイル */
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+
 @media print {
+
   /* 印刷時に不要な要素を非表示にする */
   header,
   button,
