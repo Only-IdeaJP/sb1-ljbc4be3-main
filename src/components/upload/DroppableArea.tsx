@@ -26,6 +26,8 @@ const DroppableArea: React.FC<DroppableAreaProps> = ({
      */
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
+        e.stopPropagation();
+
         // タグをドロップ可能に
         if (e.dataTransfer.types.includes('tag')) {
             setIsDragOver(true);
@@ -35,7 +37,9 @@ const DroppableArea: React.FC<DroppableAreaProps> = ({
     /**
      * ドラッグリーブハンドラ
      */
-    const handleDragLeave = () => {
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
         setIsDragOver(false);
     };
 
@@ -44,11 +48,20 @@ const DroppableArea: React.FC<DroppableAreaProps> = ({
      */
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDragOver(false);
+
+        // デバッグ情報
+        console.log('Drop event detected');
+        console.log('Data transfer types:', e.dataTransfer.types);
 
         // ドロップされたタグを取得
         const tag = e.dataTransfer.getData('tag');
+        console.log('Dropped tag:', tag);
+
         if (tag) {
+            // デバッグ情報
+            console.log(`Calling onDrop with id=${id}, tag=${tag}`);
             onDrop(id, tag);
         }
     };
@@ -64,7 +77,7 @@ const DroppableArea: React.FC<DroppableAreaProps> = ({
 
             {/* ドラッグオーバー時のオーバーレイ表示 */}
             {isDragOver && (
-                <div className="absolute inset-0 bg-indigo-100 bg-opacity-40 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-indigo-100 bg-opacity-40 flex items-center justify-center pointer-events-none z-10">
                     <div className="bg-white rounded-lg shadow-lg p-3 animate-pulse flex items-center">
                         <TagIcon className="w-5 h-5 text-indigo-600 mr-2" />
                         <span className="text-indigo-700 font-medium">タグをドロップ</span>

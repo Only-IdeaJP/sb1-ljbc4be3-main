@@ -1,7 +1,8 @@
 // src/components/upload/DraggableTag.tsx
 import { Tag as TagIcon } from "lucide-react";
 import React, { useEffect } from "react";
-import { getTagStyle, TAG_COLORS, TagStyle } from "../../constant/Constant";
+import { TAG_COLORS, TagStyle } from "../../constant/Constant";
+
 interface DraggableTagProps {
     tag: string;
     onClick?: () => void;
@@ -30,7 +31,12 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
         // ドラッグデータをセット
         e.dataTransfer.setData('tag', tag);
-        console.log("tag =", tag, " => style =", getTagStyle(tag));
+
+        // デバッグ情報
+        console.log(`Drag started for tag: ${tag}`);
+        console.log("DataTransfer effectAllowed:", e.dataTransfer.effectAllowed);
+        e.dataTransfer.effectAllowed = "copy";
+
         // フィードバック画像のカスタマイズ
         if (e.dataTransfer.setDragImage) {
             // タグのクローンを作成
@@ -61,6 +67,10 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
      * ドラッグ終了ハンドラ
      */
     const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        // デバッグ情報
+        console.log(`Drag ended for tag: ${tag}`);
+        console.log("Drag result:", e.dataTransfer.dropEffect);
+
         // ドラッグ終了時のクラスを削除
         document.body.classList.remove('tag-dragging');
 
@@ -77,11 +87,10 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
     }, []);
 
     return (
-
         <div
             className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${tagStyle.bg} ${tagStyle.text} ${tagStyle.hoverBg} border ${tagStyle.border} cursor-pointer transition-colors transform hover:scale-105 ${className}`}
             onClick={onClick}
-            draggable
+            draggable="true"
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
@@ -90,6 +99,5 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
         </div>
     );
 };
-
 
 export default DraggableTag;
