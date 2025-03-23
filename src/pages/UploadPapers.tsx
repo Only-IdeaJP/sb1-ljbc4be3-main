@@ -13,7 +13,6 @@ import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_TAGS } from "../../constant/Constant";
 import { HotToast } from "../components/Toaster";
 import DraggableTag from "../components/upload/DraggableTag";
-import DroppableArea from "../components/upload/DroppableArea";
 import FilePreview from "../components/upload/FilePreview";
 import { useAuth } from "../hooks/useAuth";
 import { usePdfProcessor } from "../hooks/usePdfProcessor";
@@ -262,6 +261,9 @@ const UploadPapers: React.FC = () => {
 
   // タグをページに適用する関数
   const applyTagToPage = useCallback((fileId: string, pageId: string, tag: string) => {
+    // 変更: 確認のためのコメントを追加
+    console.log(`Applying tag "${tag}" to page ${pageId} of file ${fileId}`);
+
     setFiles(prev =>
       prev.map(file => {
         if (file.id === fileId) {
@@ -327,7 +329,9 @@ const UploadPapers: React.FC = () => {
 
   // タグを特定のPDFの全ページに適用する
   const applyTagToPdfAllPages = useCallback((fileId: string, tag: string) => {
-    // 確認不要で適用（既に詳細ビュー内なので）
+    // 変更: 確認のためのコメントを追加
+    console.log(`Applying tag "${tag}" to all pages of PDF ${fileId}`);
+
     setFiles(prev =>
       prev.map(file => {
         if (file.id === fileId) {
@@ -509,15 +513,7 @@ const UploadPapers: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {files.map((file) => (
-              <DroppableArea
-                key={file.id}
-                id={file.id}
-                onDrop={(fileId, tag) => {
-                  // PDF/画像共通でドロップ時のタグ適用処理
-                  applyTagToPage(fileId, file.pages[0].id, tag);
-                }}
-                className="relative"
-              >
+              <div key={file.id} className="relative">
                 <FilePreview
                   id={file.id}
                   filename={file.file.name}
@@ -531,10 +527,11 @@ const UploadPapers: React.FC = () => {
                   onRemove={removeFile}
                   onRemoveTag={removeTagFromPage}
                   onApplyTag={applyTagToPage}
-                  onApplyTagToAllPages={applyTagToPdfAllPages} // 特定のPDFの全ページにタグを適用
+                  onApplyTagToAllPages={applyTagToPdfAllPages} // PDFの全ページにタグを適用する関数
                   disableControls={isUploading}
+                  applyToAllPagesLabel={file.type === "pdf" ? "※ドラッグ＆ドロップでタグを全ページに適用します" : ""}
                 />
-              </DroppableArea>
+              </div>
             ))}
           </div>
         </div>

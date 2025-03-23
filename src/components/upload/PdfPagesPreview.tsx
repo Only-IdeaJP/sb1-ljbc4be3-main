@@ -1,8 +1,9 @@
 // src/components/upload/PdfPagesPreview.tsx
 import { ChevronLeft, ChevronRight, TagIcon, X } from "lucide-react";
 import React, { useState } from "react";
-import { DEFAULT_TAGS, TAG_COLORS } from "../../constant/Constant";
+import { TAG_COLORS } from "../../constant/Constant";
 import DroppableArea from "./DroppableArea";
+
 interface PdfPage {
     id: string;
     index: number;
@@ -18,7 +19,6 @@ interface PdfPagesPreviewProps {
     uploaded: boolean;
     onRemoveTag: (fileId: string, pageId: string, tag: string) => void;
     onApplyTag: (fileId: string, pageId: string, tag: string) => void;
-    onApplyTagToAllPages?: (tag: string) => void; // タグを全ページに適用するオプション
     disableControls?: boolean;
 }
 
@@ -34,7 +34,6 @@ const PdfPagesPreview: React.FC<PdfPagesPreviewProps> = ({
     uploaded,
     onRemoveTag,
     onApplyTag,
-    onApplyTagToAllPages,
     disableControls = false
 }) => {
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -63,13 +62,6 @@ const PdfPagesPreview: React.FC<PdfPagesPreviewProps> = ({
     const applyTagToCurrentPage = (tag: string) => {
         if (!currentPage.tags.includes(tag)) {
             onApplyTag(fileId, currentPage.id, tag);
-        }
-    };
-
-    // タグを全ページに適用
-    const handleApplyTagToAllPages = (tag: string) => {
-        if (onApplyTagToAllPages) {
-            onApplyTagToAllPages(tag);
         }
     };
 
@@ -154,33 +146,7 @@ const PdfPagesPreview: React.FC<PdfPagesPreviewProps> = ({
                 <div className="p-4">
                     <div className="flex justify-between items-center">
                         <p className="text-xs text-gray-500 mb-1">ページ {currentPage.index} のタグ:</p>
-                        {onApplyTagToAllPages && (
-                            <div className="dropdown relative">
-                                <button className="text-xs text-indigo-600 hover:text-indigo-800 mb-1">
-                                    タグ適用オプション
-                                </button>
-                                <div className="dropdown-menu absolute hidden hover:block right-0 mt-1 bg-white rounded shadow-lg p-2 z-10">
-                                    <div className="w-40">
-                                        {/* タグをページに適用 */}
-                                        {DEFAULT_TAGS.map((tag) => {
-                                            const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
-                                            return (
-                                                <button
-                                                    key={tag}
-                                                    onClick={() => handleApplyTagToAllPages(tag)}
-                                                    className={`block w-full text-left px-2 py-1 text-xs ${tagStyle.text} ${tagStyle.bg} rounded mb-1`}
-                                                >
-                                                    <span className="flex items-center">
-                                                        <TagIcon className="w-3 h-3 mr-1" />
-                                                        すべてに「{tag}」を追加
-                                                    </span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        <p className="text-xs text-indigo-600 mb-1">このページにのみタグを適用します</p>
                     </div>
                     <div className="flex flex-wrap gap-1">
                         {currentPage.tags.length > 0 ? (
@@ -210,7 +176,7 @@ const PdfPagesPreview: React.FC<PdfPagesPreviewProps> = ({
                         )}
                     </div>
                     <div className="mt-3 text-xs text-gray-500">
-                        <p>ヒント: タグをドラッグ＆ドロップして現在のページにタグを適用できます</p>
+                        <p>ヒント: タグをドラッグ＆ドロップして現在表示中のページにタグを適用します</p>
                     </div>
                 </div>
             </DroppableArea>
