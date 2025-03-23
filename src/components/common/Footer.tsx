@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FOOTER_LINKS } from "../../../constant/Constant";
+import { FOOTER_LINKS } from "../../constant/Constant";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();

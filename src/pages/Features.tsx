@@ -1,7 +1,7 @@
+import { ArrowLeft } from "lucide-react";
 import React from "react";
 import { Link } from "react-router-dom";
-import { ADDITONAL_FEATURES, Main_Features } from "../../constant/Constant";
-import { ArrowLeft } from "lucide-react";
+import { ADDITONAL_FEATURES, Main_Features } from "../constant/Constant";
 
 // Reusable Feature Card Component
 const FeatureCard: React.FC<{
