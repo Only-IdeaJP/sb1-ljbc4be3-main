@@ -1,22 +1,8 @@
 // src/components/upload/FilePreview.tsx
 import { CheckCircle, FileText, Image as ImageIcon, Tag as TagIcon, X } from "lucide-react";
-import React from "react";
-
-// タグの色設定 (DraggableTagと同じ設定を使用)
-const TAG_COLORS: Record<string, { bg: string, text: string }> = {
-    "算数": { bg: "bg-indigo-100", text: "text-indigo-800" },
-    "国語": { bg: "bg-red-100", text: "text-red-800" },
-    "理科": { bg: "bg-green-100", text: "text-green-800" },
-    "社会": { bg: "bg-yellow-100", text: "text-yellow-800" },
-    "英語": { bg: "bg-blue-100", text: "text-blue-800" },
-    "プリント": { bg: "bg-purple-100", text: "text-purple-800" },
-    "テスト": { bg: "bg-pink-100", text: "text-pink-800" },
-    "宿題": { bg: "bg-orange-100", text: "text-orange-800" },
-    "復習": { bg: "bg-teal-100", text: "text-teal-800" },
-    "予習": { bg: "bg-cyan-100", text: "text-cyan-800" },
-    // デフォルトカラー
-    "default": { bg: "bg-gray-100", text: "text-gray-800" }
-};
+import React, { useState } from "react";
+import { TAG_COLORS } from "../../constant/Constant";
+import PdfPagesPreview from "./PdfPagesPreview";
 
 interface FilePreviewProps {
     id: string;
@@ -25,17 +11,25 @@ interface FilePreviewProps {
     fileType: "image" | "pdf";
     pageCount: number;
     fileSize: number;
-    tags: string[];
+    pages: {
+        id: string;
+        index: number;
+        imageData?: string;
+        tags: string[];
+    }[];
     uploading: boolean;
     uploaded: boolean;
     onRemove: (id: string) => void;
-    onRemoveTag: (id: string, tag: string) => void;
+    onRemoveTag: (fileId: string, pageId: string, tag: string) => void;
+    onApplyTag: (fileId: string, pageId: string, tag: string) => void;
+    onApplyTagToAllPages?: (fileId: string, tag: string) => void; // タグを全ページに適用する関数
     disableControls?: boolean;
 }
 
 /**
  * ファイルプレビューコンポーネント
  * アップロードされたファイルのプレビューと情報を表示
+ * PDFの場合は各ページのプレビューとタグ付けをサポート
  */
 const FilePreview: React.FC<FilePreviewProps> = ({
     id,
@@ -44,13 +38,17 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     fileType,
     pageCount,
     fileSize,
-    tags,
+    pages,
     uploading,
     uploaded,
     onRemove,
     onRemoveTag,
+    onApplyTag,
+    onApplyTagToAllPages,
     disableControls = false
 }) => {
+    const [expanded, setExpanded] = useState(false);
+
     /**
      * ファイルサイズを読みやすい形式にフォーマットする
      */
@@ -61,12 +59,44 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     };
 
     /**
-     * タグの色を取得する
+     * タグを全ページに適用する
      */
-    const getTagColors = (tag: string) => {
-        return TAG_COLORS[tag] || TAG_COLORS.default;
+    const handleApplyTagToAllPages = (tag: string) => {
+        if (onApplyTagToAllPages) {
+            onApplyTagToAllPages(id, tag);
+        }
     };
 
+    // PDFファイルで、ページタグを表示するモードの場合
+    if (fileType === "pdf" && expanded) {
+        return (
+            <div className="border rounded-lg overflow-hidden bg-gray-50 shadow-sm">
+                <div className="flex items-center justify-between bg-indigo-50 p-2 border-b">
+                    <h4 className="font-medium text-gray-900">{filename}</h4>
+                    <button
+                        onClick={() => setExpanded(false)}
+                        className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
+                    >
+                        概要に戻る
+                    </button>
+                </div>
+
+                <PdfPagesPreview
+                    fileId={id}
+                    filename={filename}
+                    pages={pages}
+                    uploading={uploading}
+                    uploaded={uploaded}
+                    onRemoveTag={onRemoveTag}
+                    onApplyTag={onApplyTag}
+                    onApplyTagToAllPages={tag => handleApplyTagToAllPages(tag)} // 現在のファイルの全ページにタグを適用
+                    disableControls={disableControls}
+                />
+            </div>
+        );
+    }
+
+    // 通常の表示モード（画像またはPDFの概要）
     return (
         <div className="border rounded-lg overflow-hidden bg-gray-50 shadow-sm transition-shadow hover:shadow">
             {/* ファイルプレビュー */}
@@ -129,24 +159,35 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                         : `画像 - ${formatFileSize(fileSize)}`}
                 </p>
 
+                {/* PDFの場合、ページ表示切り替えボタンを表示 */}
+                {fileType === "pdf" && !disableControls && !uploading && !uploaded && (
+                    <button
+                        onClick={() => setExpanded(true)}
+                        className="w-full py-1 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 mb-3"
+                    >
+                        各ページのタグを編集
+                    </button>
+                )}
+
                 {/* タグ */}
-                <div className="mt-3">
-                    <p className="text-xs text-gray-500 mb-1">タグ:</p>
+                <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">ファイル全体のタグ:</p>
                     <div className="flex flex-wrap gap-1">
-                        {tags.length > 0 ? (
-                            tags.map((tag) => {
-                                const { bg, text } = getTagColors(tag);
+                        {/* PDFの場合は最初のページのタグを表示、画像の場合はそのまま */}
+                        {pages.length > 0 && pages[0].tags.length > 0 ? (
+                            pages[0].tags.map((tag) => {
+                                const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
                                 return (
                                     <span
                                         key={tag}
-                                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${bg} ${text}`}
+                                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tagStyle.bg} ${tagStyle.text}`}
                                     >
                                         <TagIcon className="w-3 h-3 mr-1" />
                                         {tag}
                                         {!disableControls && !uploading && !uploaded && (
                                             <button
-                                                className="ml-1 text-indigo-600 hover:text-indigo-800"
-                                                onClick={() => onRemoveTag(id, tag)}
+                                                className="ml-1 text-gray-500 hover:text-red-600"
+                                                onClick={() => onRemoveTag(id, pages[0].id, tag)}
                                                 aria-label={`${tag}タグを削除`}
                                             >
                                                 <X className="w-3 h-3" />

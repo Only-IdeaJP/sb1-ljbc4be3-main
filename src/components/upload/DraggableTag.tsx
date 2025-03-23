@@ -1,27 +1,12 @@
 // src/components/upload/DraggableTag.tsx
 import { Tag as TagIcon } from "lucide-react";
-import React from "react";
-
-// タグの色設定
-const TAG_COLORS: Record<string, { bg: string, text: string, hoverBg: string }> = {
-    "算数": { bg: "bg-indigo-100", text: "text-indigo-800", hoverBg: "hover:bg-indigo-200" },
-    "国語": { bg: "bg-red-100", text: "text-red-800", hoverBg: "hover:bg-red-200" },
-    "理科": { bg: "bg-green-100", text: "text-green-800", hoverBg: "hover:bg-green-200" },
-    "社会": { bg: "bg-yellow-100", text: "text-yellow-800", hoverBg: "hover:bg-yellow-200" },
-    "英語": { bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-200" },
-    "プリント": { bg: "bg-purple-100", text: "text-purple-800", hoverBg: "hover:bg-purple-200" },
-    "テスト": { bg: "bg-pink-100", text: "text-pink-800", hoverBg: "hover:bg-pink-200" },
-    "宿題": { bg: "bg-orange-100", text: "text-orange-800", hoverBg: "hover:bg-orange-200" },
-    "復習": { bg: "bg-teal-100", text: "text-teal-800", hoverBg: "hover:bg-teal-200" },
-    "予習": { bg: "bg-cyan-100", text: "text-cyan-800", hoverBg: "hover:bg-cyan-200" },
-    // デフォルトカラー
-    "default": { bg: "bg-gray-100", text: "text-gray-800", hoverBg: "hover:bg-gray-200" }
-};
-
+import React, { useEffect } from "react";
+import { getTagStyle, TAG_COLORS, TagStyle } from "../../constant/Constant";
 interface DraggableTagProps {
     tag: string;
     onClick?: () => void;
     onDragStart?: () => void;
+    onDragEnd?: () => void;
     className?: string;
 }
 
@@ -33,10 +18,11 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
     tag,
     onClick,
     onDragStart,
+    onDragEnd,
     className = "",
 }) => {
-    // タグ用の色を取得 (設定にない場合はデフォルト色を使用)
-    const { bg, text, hoverBg } = TAG_COLORS[tag] || TAG_COLORS.default;
+    // タグ用の色を直接TAG_COLORSから取得
+    const tagStyle: TagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
 
     /**
      * ドラッグ開始ハンドラ
@@ -44,7 +30,7 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
         // ドラッグデータをセット
         e.dataTransfer.setData('tag', tag);
-
+        console.log("tag =", tag, " => style =", getTagStyle(tag));
         // フィードバック画像のカスタマイズ
         if (e.dataTransfer.setDragImage) {
             // タグのクローンを作成
@@ -63,22 +49,47 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
             }, 0);
         }
 
+        // ドラッグ開始時のクラスを追加
+        document.body.classList.add('tag-dragging');
+
         if (onDragStart) {
             onDragStart();
         }
     };
 
+    /**
+     * ドラッグ終了ハンドラ
+     */
+    const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        // ドラッグ終了時のクラスを削除
+        document.body.classList.remove('tag-dragging');
+
+        if (onDragEnd) {
+            onDragEnd();
+        }
+    };
+
+    // コンポーネントのアンマウント時にクラスを削除
+    useEffect(() => {
+        return () => {
+            document.body.classList.remove('tag-dragging');
+        };
+    }, []);
+
     return (
+
         <div
-            className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${bg} ${text} ${hoverBg} cursor-pointer transition-colors transform hover:scale-105 ${className}`}
+            className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${tagStyle.bg} ${tagStyle.text} ${tagStyle.hoverBg} border ${tagStyle.border} cursor-pointer transition-colors transform hover:scale-105 ${className}`}
             onClick={onClick}
             draggable
             onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
         >
             <TagIcon className="w-3.5 h-3.5 mr-1.5" />
             {tag}
         </div>
     );
 };
+
 
 export default DraggableTag;
