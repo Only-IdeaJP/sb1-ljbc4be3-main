@@ -1,7 +1,7 @@
+import { ArrowLeft } from "lucide-react";
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { TERMS_CONTENT } from "../../constant/Constant";
+import { TERMS_CONTENT } from "../constant/Constant";
 
 export const Terms: React.FC = () => {
   return (

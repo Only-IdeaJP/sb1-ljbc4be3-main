@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
+import { NAV_LINKS } from "../../constant/Constant";
 import { useAuth } from "../../hooks/useAuth";
-import { NAV_LINKS } from "../../../constant/Constant";
 
 const Header = () => {
   const { user } = useAuth();

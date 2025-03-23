@@ -1,5 +1,5 @@
 import React from "react";
-import { PRIVACY_CONTENT } from "../../constant/Constant";
+import { PRIVACY_CONTENT } from "../constant/Constant";
 
 export const Privacy: React.FC = () => {
   return (

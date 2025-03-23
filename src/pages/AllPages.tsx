@@ -11,25 +11,10 @@ import {
   Tag as TagIcon, Trash2
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import { DEFAULT_TAGS } from "../../constant/Constant";
+import { DEFAULT_TAGS, TAG_COLORS } from "../constant/Constant";
+
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
-
-// タグの色設定 (共通の設定)
-const TAG_COLORS: Record<string, { bg: string, text: string, hoverBg: string, border: string }> = {
-  "算数": { bg: "bg-indigo-100", text: "text-indigo-800", hoverBg: "hover:bg-indigo-200", border: "border-indigo-200" },
-  "国語": { bg: "bg-red-100", text: "text-red-800", hoverBg: "hover:bg-red-200", border: "border-red-200" },
-  "理科": { bg: "bg-green-100", text: "text-green-800", hoverBg: "hover:bg-green-200", border: "border-green-200" },
-  "社会": { bg: "bg-yellow-100", text: "text-yellow-800", hoverBg: "hover:bg-yellow-200", border: "border-yellow-200" },
-  "英語": { bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-200", border: "border-blue-200" },
-  "プリント": { bg: "bg-purple-100", text: "text-purple-800", hoverBg: "hover:bg-purple-200", border: "border-purple-200" },
-  "テスト": { bg: "bg-pink-100", text: "text-pink-800", hoverBg: "hover:bg-pink-200", border: "border-pink-200" },
-  "宿題": { bg: "bg-orange-100", text: "text-orange-800", hoverBg: "hover:bg-orange-200", border: "border-orange-200" },
-  "復習": { bg: "bg-teal-100", text: "text-teal-800", hoverBg: "hover:bg-teal-200", border: "border-teal-200" },
-  "予習": { bg: "bg-cyan-100", text: "text-cyan-800", hoverBg: "hover:bg-cyan-200", border: "border-cyan-200" },
-  // デフォルトカラー
-  "default": { bg: "bg-gray-100", text: "text-gray-800", hoverBg: "hover:bg-gray-200", border: "border-gray-200" }
-};
 
 interface Paper {
   id: string;
@@ -106,7 +91,9 @@ const PaperCard: React.FC<{
       <div className="p-3">
         <div className="flex flex-wrap gap-1 mt-1">
           {paper.tags.map(tag => {
-            const { bg, text } = TAG_COLORS[tag] || TAG_COLORS.default;
+            // 修正: タグスタイルをTAG_COLORS定数から直接取得
+            const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+            const { bg, text } = tagStyle;
             return (
               <span
                 key={tag}
@@ -145,9 +132,6 @@ export const AllPages: React.FC = () => {
     type: "success" | "error";
     text: string;
   } | null>(null);
-
-  // // 論理削除フラグ
-  // const [showDeleted, setShowDeleted] = useState(false);
 
   // 問題の取得
   useEffect(() => {
@@ -375,7 +359,7 @@ export const AllPages: React.FC = () => {
             </button>
 
             {isFilterOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 py-1 border">
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 py-1 border">
                 <button
                   onClick={() => { setSortBy("date"); setIsFilterOpen(false); }}
                   className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "date" ? "bg-indigo-50 text-indigo-700" : "text-gray-700 hover:bg-gray-50"}`}
@@ -401,9 +385,9 @@ export const AllPages: React.FC = () => {
             )}
           </div>
 
-          {/* フィルターボタン */}
+          {/* フィルターボタン - カウンターを右側に配置 */}
           <button
-            className={`px-3 py-2 border rounded-md ${activeTags.length > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-300" : "bg-white text-gray-600"}`}
+            className={`px-3 py-2 border rounded-md flex items-center ${activeTags.length > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-300" : "bg-white text-gray-600"}`}
             onClick={() => setActiveTags([])}
             disabled={activeTags.length === 0}
           >
@@ -420,7 +404,9 @@ export const AllPages: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           {DEFAULT_TAGS.map((tag) => {
             const isActive = activeTags.includes(tag);
-            const { bg, text, hoverBg, border } = TAG_COLORS[tag] || TAG_COLORS.default;
+            // 修正: タグスタイルをTAG_COLORS定数から直接取得
+            const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+            const { bg, text, hoverBg, border } = tagStyle;
             const count = tagCounts[tag] || 0;
 
             return (
@@ -453,7 +439,7 @@ export const AllPages: React.FC = () => {
               </span>
             </div>
 
-            {/* タグ一括適用ドロップダウン */}
+            {/* タグ一括適用ドロップダウン - z-indexを高く設定 */}
             <div className="relative group">
               <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 inline-flex items-center">
                 <TagIcon className="w-4 h-4 mr-2" />
@@ -461,9 +447,12 @@ export const AllPages: React.FC = () => {
                 <ChevronDown className="w-4 h-4 ml-1" />
               </button>
 
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 py-1 border hidden group-hover:block">
+              {/* タグ適用ドロップダウンメニュー - z-indexを高く設定 */}
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 py-1 border hidden group-hover:block">
                 {DEFAULT_TAGS.map((tag) => {
-                  const { bg, text } = TAG_COLORS[tag] || TAG_COLORS.default;
+                  // 修正: タグスタイルをTAG_COLORS定数から直接取得
+                  const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+                  const { bg, text } = tagStyle;
                   return (
                     <button
                       key={tag}
@@ -617,7 +606,9 @@ export const AllPages: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-wrap gap-1">
                       {paper.tags.map(tag => {
-                        const { bg, text } = TAG_COLORS[tag] || TAG_COLORS.default;
+                        // 修正: タグスタイルをgetTagStyle関数を使用して取得
+                        const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+                        const { bg, text } = tagStyle;
                         return (
                           <span
                             key={tag}

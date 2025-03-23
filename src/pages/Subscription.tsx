@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { CheckCircle2, CreditCard, Timer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, CheckCircle2, Timer } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -13,7 +13,7 @@ export const Subscription: React.FC = () => {
   useEffect(() => {
     const checkTrialPeriod = async () => {
       if (!user) return;
-      
+
       try {
         const { data: userData, error } = await supabase
           .from('users')
@@ -28,7 +28,7 @@ export const Subscription: React.FC = () => {
         const diffTime = Math.abs(now.getTime() - createdDate.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const daysLeft = Math.max(7 - diffDays, 0);
-        
+
         setTrialDaysLeft(daysLeft);
 
         // トライアル期間が終了している場合、支払いページにリダイレクト

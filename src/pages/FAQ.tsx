@@ -1,7 +1,7 @@
+import { ArrowLeft } from "lucide-react";
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { FAQS } from "../../constant/Constant";
+import { FAQS } from "../constant/Constant";
 
 export const FAQ: React.FC = () => {
   return (
