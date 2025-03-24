@@ -5,14 +5,22 @@ import {
   ChevronDown,
   Clock,
   Filter,
-  Grid, List,
+  Grid,
+  List,
   RotateCcw,
-  Search, SlidersHorizontal,
-  Tag as TagIcon, Trash2
+  Search,
+  SlidersHorizontal,
+  Tag as TagIcon,
+  Trash2,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import { createPortal } from "react-dom"; // <-- 1) Import createPortal
 import { DEFAULT_TAGS, TAG_COLORS } from "../constant/Constant";
-
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
 
@@ -41,10 +49,6 @@ const getDifficultyLabel = (paper: Paper) => {
 };
 
 /**
- * 全ページ管理コンポーネント
- * アップロードした全ての問題を管理する
- */
-/**
  * PaperCardコンポーネント
  * グリッドビューで表示する問題カード
  */
@@ -56,8 +60,12 @@ const PaperCard: React.FC<{
   const difficulty = getDifficultyLabel(paper);
 
   return (
-    <div className={`relative bg-white rounded-lg shadow-sm overflow-hidden border transition-all ${isSelected ? 'border-indigo-500 shadow-md scale-[1.02]' : 'border-transparent hover:border-gray-300'
-      }`}>
+    <div
+      className={`relative bg-white rounded-lg shadow-sm overflow-hidden border transition-all ${isSelected
+        ? "border-indigo-500 shadow-md scale-[1.02]"
+        : "border-transparent hover:border-gray-300"
+        }`}
+    >
       {/* 選択チェックボックス */}
       <div className="absolute top-2 left-2 z-10">
         <input
@@ -71,7 +79,9 @@ const PaperCard: React.FC<{
       {/* 難易度ラベル */}
       {difficulty.label && (
         <div className="absolute top-2 right-2 z-10">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${difficulty.color}`}>
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${difficulty.color}`}
+          >
             {difficulty.label}
           </span>
         </div>
@@ -90,9 +100,9 @@ const PaperCard: React.FC<{
       {/* タグ表示 */}
       <div className="p-3">
         <div className="flex flex-wrap gap-1 mt-1">
-          {paper.tags.map(tag => {
-            // 修正: タグスタイルをTAG_COLORS定数から直接取得
-            const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+          {paper.tags.map((tag) => {
+            const tagStyle =
+              TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
             const { bg, text } = tagStyle;
             return (
               <span
@@ -127,11 +137,48 @@ export const AllPages: React.FC = () => {
   const [sortBy, setSortBy] = useState<"date" | "tags" | "difficulty">("date");
   const [searchTerm, setSearchTerm] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [showTagPopup, setShowTagPopup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // タグ適用ドロップダウンの参照
+  const tagPopupRef = useRef<HTMLDivElement>(null);
+  // For positioning if you want a dynamic position:
+  const [popupCoords, setPopupCoords] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+
+  useEffect(() => {
+    if (showTagPopup) {
+      // find the button's bounding rect so we can position the dropdown in the right place
+      const button = document.getElementById("tagPopupButton");
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        setPopupCoords({ x: rect.right, y: rect.bottom });
+      }
+    }
+  }, [showTagPopup]);
+
+  // 外部クリックを検出してタグポップアップを閉じる
+  useEffect(() => {
+    function handleClickOutside(event: globalThis.MouseEvent) {
+      if (
+        tagPopupRef.current &&
+        !tagPopupRef.current.contains(event.target as Node)
+      ) {
+        setShowTagPopup(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // 問題の取得
   useEffect(() => {
@@ -161,7 +208,9 @@ export const AllPages: React.FC = () => {
   const handleDelete = async () => {
     if (
       selectedPapers.length === 0 ||
-      !confirm(`選択した${selectedPapers.length}問を削除してもよろしいですか？この操作は元に戻せません。`)
+      !confirm(
+        `選択した${selectedPapers.length}問を削除してもよろしいですか？この操作は元に戻せません。`
+      )
     )
       return;
     setLoading(true);
@@ -174,7 +223,10 @@ export const AllPages: React.FC = () => {
 
       setPapers((prev) => prev.filter((p) => !selectedPapers.includes(p.id)));
       setSelectedPapers([]);
-      setMessage({ type: "success", text: `選択した${selectedPapers.length}問を削除しました` });
+      setMessage({
+        type: "success",
+        text: `選択した${selectedPapers.length}問を削除しました`,
+      });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message });
     } finally {
@@ -185,36 +237,42 @@ export const AllPages: React.FC = () => {
   // タグの一括適用
   const applyTagToSelected = (tag: string) => {
     if (selectedPapers.length === 0) return;
-    if (!confirm(`選択した${selectedPapers.length}問に「${tag}」タグを適用しますか？`)) return;
+    if (
+      !confirm(
+        `選択した${selectedPapers.length}問に「${tag}」タグを適用しますか？`
+      )
+    )
+      return;
 
     setLoading(true);
     const updates = papers
       .filter(paper => selectedPapers.includes(paper.id))
       .map(paper => ({
         id: paper.id,
+        user_id: user!.id,
+        file_path: paper.file_path,
         tags: paper.tags.includes(tag) ? paper.tags : [...paper.tags, tag]
       }));
 
     const updatePapers = async () => {
       try {
-        const { error } = await supabase
-          .from("papers")
-          .upsert(updates);
+        const { error } = await supabase.from("papers").upsert(updates);
 
         if (error) throw error;
 
-        // 成功したら、ローカルのデータも更新
-        setPapers(prev => prev.map(paper => {
-          const update = updates.find(u => u.id === paper.id);
-          if (update) {
-            return { ...paper, tags: update.tags };
-          }
-          return paper;
-        }));
+        setPapers((prev) =>
+          prev.map((paper) => {
+            const update = updates.find((u) => u.id === paper.id);
+            if (update) {
+              return { ...paper, tags: update.tags };
+            }
+            return paper;
+          })
+        );
 
         setMessage({
           type: "success",
-          text: `選択した${selectedPapers.length}問に「${tag}」タグを適用しました`
+          text: `選択した${selectedPapers.length}問に「${tag}」タグを適用しました`,
         });
       } catch (err: any) {
         setMessage({ type: "error", text: err.message });
@@ -228,10 +286,8 @@ export const AllPages: React.FC = () => {
 
   // タグの切り替え
   const toggleTag = (tag: string) => {
-    setActiveTags(prev =>
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
+    setActiveTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
 
@@ -240,7 +296,7 @@ export const AllPages: React.FC = () => {
     if (selectedPapers.length === filteredPapers.length) {
       setSelectedPapers([]);
     } else {
-      setSelectedPapers(filteredPapers.map(p => p.id));
+      setSelectedPapers(filteredPapers.map((p) => p.id));
     }
   };
 
@@ -250,22 +306,26 @@ export const AllPages: React.FC = () => {
 
     // タグによるフィルタリング
     if (activeTags.length > 0) {
-      result = result.filter(paper =>
-        activeTags.every(tag => paper.tags.includes(tag))
+      // 選択されたタグのいずれかを含むペーパーを表示（OR条件）
+      result = result.filter((paper) =>
+        activeTags.some((tag) => paper.tags.includes(tag))
       );
     }
 
     // 検索語によるフィルタリング
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
-      result = result.filter(paper =>
-        paper.tags.some(tag => tag.toLowerCase().includes(lowerSearchTerm))
+      result = result.filter((paper) =>
+        paper.tags.some((tag) => tag.toLowerCase().includes(lowerSearchTerm))
       );
     }
 
     // ソート
     if (sortBy === "date") {
-      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      result.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     } else if (sortBy === "tags") {
       result.sort((a, b) => a.tags.length - b.tags.length);
     } else if (sortBy === "difficulty") {
@@ -282,8 +342,8 @@ export const AllPages: React.FC = () => {
   // タグのカウント集計
   const tagCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    papers.forEach(paper => {
-      paper.tags.forEach(tag => {
+    papers.forEach((paper) => {
+      paper.tags.forEach((tag) => {
         counts[tag] = (counts[tag] || 0) + 1;
       });
     });
@@ -291,7 +351,7 @@ export const AllPages: React.FC = () => {
   }, [papers]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 relative">
       <h1 className="text-2xl font-bold text-gray-900 mb-4">全ページ管理</h1>
       <p className="text-gray-600 mb-6">
         アップロードした問題を管理・編集します。タグをクリックして問題を絞り込むことができます。
@@ -299,10 +359,12 @@ export const AllPages: React.FC = () => {
 
       {/* メッセージ表示 */}
       {message && (
-        <div className={`p-4 rounded-md mb-6 ${message.type === "success"
-          ? "bg-green-50 text-green-700 border border-green-200"
-          : "bg-red-50 text-red-700 border border-red-200"
-          }`}>
+        <div
+          className={`p-4 rounded-md mb-6 ${message.type === "success"
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+        >
           <div className="flex items-center">
             {message.type === "success" ? (
               <CheckCircle className="h-5 w-5 mr-2" />
@@ -335,13 +397,19 @@ export const AllPages: React.FC = () => {
           <div className="flex border rounded-md overflow-hidden">
             <button
               onClick={() => setViewMode("grid")}
-              className={`px-3 py-2 ${viewMode === "grid" ? "bg-indigo-100 text-indigo-700" : "bg-white text-gray-600"}`}
+              className={`px-3 py-2 ${viewMode === "grid"
+                ? "bg-indigo-100 text-indigo-700"
+                : "bg-white text-gray-600"
+                }`}
             >
               <Grid className="h-5 w-5" />
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`px-3 py-2 ${viewMode === "list" ? "bg-indigo-100 text-indigo-700" : "bg-white text-gray-600"}`}
+              className={`px-3 py-2 ${viewMode === "list"
+                ? "bg-indigo-100 text-indigo-700"
+                : "bg-white text-gray-600"
+                }`}
             >
               <List className="h-5 w-5" />
             </button>
@@ -361,22 +429,40 @@ export const AllPages: React.FC = () => {
             {isFilterOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 py-1 border">
                 <button
-                  onClick={() => { setSortBy("date"); setIsFilterOpen(false); }}
-                  className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "date" ? "bg-indigo-50 text-indigo-700" : "text-gray-700 hover:bg-gray-50"}`}
+                  onClick={() => {
+                    setSortBy("date");
+                    setIsFilterOpen(false);
+                  }}
+                  className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "date"
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   <Clock className="h-4 w-4 inline mr-2" />
                   日付順
                 </button>
                 <button
-                  onClick={() => { setSortBy("tags"); setIsFilterOpen(false); }}
-                  className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "tags" ? "bg-indigo-50 text-indigo-700" : "text-gray-700 hover:bg-gray-50"}`}
+                  onClick={() => {
+                    setSortBy("tags");
+                    setIsFilterOpen(false);
+                  }}
+                  className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "tags"
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   <TagIcon className="h-4 w-4 inline mr-2" />
                   タグ数順
                 </button>
                 <button
-                  onClick={() => { setSortBy("difficulty"); setIsFilterOpen(false); }}
-                  className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "difficulty" ? "bg-indigo-50 text-indigo-700" : "text-gray-700 hover:bg-gray-50"}`}
+                  onClick={() => {
+                    setSortBy("difficulty");
+                    setIsFilterOpen(false);
+                  }}
+                  className={`block px-4 py-2 text-sm w-full text-left ${sortBy === "difficulty"
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   <AlertCircle className="h-4 w-4 inline mr-2" />
                   難易度順
@@ -387,7 +473,10 @@ export const AllPages: React.FC = () => {
 
           {/* フィルターボタン - カウンターを右側に配置 */}
           <button
-            className={`px-3 py-2 border rounded-md flex items-center ${activeTags.length > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-300" : "bg-white text-gray-600"}`}
+            className={`px-3 py-2 border rounded-md flex items-center ${activeTags.length > 0
+              ? "bg-indigo-100 text-indigo-700 border-indigo-300"
+              : "bg-white text-gray-600"
+              }`}
             onClick={() => setActiveTags([])}
             disabled={activeTags.length === 0}
           >
@@ -404,8 +493,8 @@ export const AllPages: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           {DEFAULT_TAGS.map((tag) => {
             const isActive = activeTags.includes(tag);
-            // 修正: タグスタイルをTAG_COLORS定数から直接取得
-            const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+            const tagStyle =
+              TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
             const { bg, text, hoverBg, border } = tagStyle;
             const count = tagCounts[tag] || 0;
 
@@ -431,73 +520,93 @@ export const AllPages: React.FC = () => {
 
       {/* 選択時のアクションバー */}
       {selectedPapers.length > 0 && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 shadow-sm animate-fadeIn">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex-1">
-              <span className="font-medium text-indigo-700">
-                {selectedPapers.length}問を選択中
-              </span>
-            </div>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 shadow-sm animate-fadeIn flex flex-wrap items-center gap-4">
+          <div className="flex-1">
+            <span className="font-medium text-indigo-700">
+              {selectedPapers.length}問を選択中
+            </span>
+          </div>
 
-            {/* タグ一括適用ドロップダウン - z-indexを高く設定 */}
-            <div className="relative group">
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 inline-flex items-center">
-                <TagIcon className="w-4 h-4 mr-2" />
-                タグ適用
-                <ChevronDown className="w-4 h-4 ml-1" />
-              </button>
-
-              {/* タグ適用ドロップダウンメニュー - z-indexを高く設定 */}
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 py-1 border hidden group-hover:block">
-                {DEFAULT_TAGS.map((tag) => {
-                  // 修正: タグスタイルをTAG_COLORS定数から直接取得
-                  const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
-                  const { bg, text } = tagStyle;
-                  return (
-                    <button
-                      key={tag}
-                      onClick={() => applyTagToSelected(tag)}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                    >
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded ${bg} ${text} text-xs`}>
-                        <TagIcon className="w-3 h-3 mr-1" />
-                        {tag}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 全選択/解除ボタン */}
+          {/* タグ一括適用ドロップダウン */}
+          <div className="inline-block" id="tagPopupButton">
             <button
-              onClick={toggleSelectAll}
-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 inline-flex items-center"
+              onClick={() => setShowTagPopup(!showTagPopup)}
             >
-              {selectedPapers.length === filteredPapers.length ? (
-                <span className="inline-flex items-center">
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  選択解除
-                </span>
-              ) : (
-                <span className="inline-flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  全て選択
-                </span>
-              )}
-            </button>
-
-            {/* 削除ボタン */}
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 inline-flex items-center"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              削除 ({selectedPapers.length})
+              <TagIcon className="w-4 h-4 mr-2" />
+              タグ適用
+              <ChevronDown className="w-4 h-4 ml-1" />
             </button>
           </div>
+
+          {/* 全選択/解除ボタン */}
+          <button
+            onClick={toggleSelectAll}
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+          >
+            {selectedPapers.length === filteredPapers.length ? (
+              <span className="inline-flex items-center">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                選択解除
+              </span>
+            ) : (
+              <span className="inline-flex items-center">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                全て選択
+              </span>
+            )}
+          </button>
+
+          {/* 削除ボタン */}
+          <button
+            onClick={handleDelete}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 inline-flex items-center"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            削除 ({selectedPapers.length})
+          </button>
         </div>
       )}
+
+      {/* This is the PORTAL that ensures the dropdown is above everything */}
+      {showTagPopup &&
+        createPortal(
+          <div
+            ref={tagPopupRef}
+            style={{
+              position: "absolute",
+              top: popupCoords.y,
+              left: popupCoords.x - 200, // adjust as needed
+              zIndex: 9999,
+            }}
+            className="w-48 bg-white rounded-md shadow-lg py-1 border"
+          >
+            {DEFAULT_TAGS.map((tag) => {
+              const tagStyle =
+                TAG_COLORS[tag as keyof typeof TAG_COLORS] ||
+                TAG_COLORS.default;
+              const { bg, text } = tagStyle;
+              return (
+                <button
+                  key={tag}
+                  onClick={() => {
+                    applyTagToSelected(tag);
+                    setShowTagPopup(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded ${bg} ${text} text-xs`}
+                  >
+                    <TagIcon className="w-3 h-3 mr-1" />
+                    {tag}
+                  </span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )}
 
       {/* ページ一覧 - グリッドまたはリスト表示 */}
       {loading ? (
@@ -510,17 +619,19 @@ export const AllPages: React.FC = () => {
           <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
             <TagIcon className="h-8 w-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">問題が見つかりませんでした</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            問題が見つかりませんでした
+          </h3>
           <p className="text-gray-500 mb-6">
             {activeTags.length > 0
-              ? 'フィルターを解除するか、別のタグで試してください。'
-              : '問題をアップロードしてタグ付けを行いましょう。'}
+              ? "フィルターを解除するか、別のタグで試してください。"
+              : "問題をアップロードしてタグ付けを行いましょう。"}
           </p>
           <button
             onClick={() => setActiveTags([])}
             className={`px-4 py-2 ${activeTags.length > 0
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-              : 'bg-gray-100 text-gray-500 cursor-not-allowed'
+              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+              : "bg-gray-100 text-gray-500 cursor-not-allowed"
               } rounded-md`}
             disabled={activeTags.length === 0}
           >
@@ -535,9 +646,9 @@ export const AllPages: React.FC = () => {
               paper={paper}
               isSelected={selectedPapers.includes(paper.id)}
               toggleSelect={() => {
-                setSelectedPapers(prev =>
+                setSelectedPapers((prev) =>
                   prev.includes(paper.id)
-                    ? prev.filter(id => id !== paper.id)
+                    ? prev.filter((id) => id !== paper.id)
                     : [...prev, paper.id]
                 );
               }}
@@ -549,24 +660,42 @@ export const AllPages: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12"
+                >
                   <input
                     type="checkbox"
-                    checked={filteredPapers.length > 0 && selectedPapers.length === filteredPapers.length}
+                    checked={
+                      filteredPapers.length > 0 &&
+                      selectedPapers.length === filteredPapers.length
+                    }
                     onChange={toggleSelectAll}
                     className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                   />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   問題
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   タグ
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   状態
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   アップロード日
                 </th>
               </tr>
@@ -575,16 +704,17 @@ export const AllPages: React.FC = () => {
               {filteredPapers.map((paper) => (
                 <tr
                   key={paper.id}
-                  className={`${selectedPapers.includes(paper.id) ? 'bg-indigo-50' : ''} hover:bg-gray-50`}
+                  className={`${selectedPapers.includes(paper.id) ? "bg-indigo-50" : ""
+                    } hover:bg-gray-50`}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="checkbox"
                       checked={selectedPapers.includes(paper.id)}
                       onChange={() => {
-                        setSelectedPapers(prev =>
+                        setSelectedPapers((prev) =>
                           prev.includes(paper.id)
-                            ? prev.filter(id => id !== paper.id)
+                            ? prev.filter((id) => id !== paper.id)
                             : [...prev, paper.id]
                         );
                       }}
@@ -594,7 +724,11 @@ export const AllPages: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 flex-shrink-0">
-                        <img className="h-10 w-10 rounded-md object-cover" src={paper.file_path} alt="" />
+                        <img
+                          className="h-10 w-10 rounded-md object-cover"
+                          src={paper.file_path}
+                          alt=""
+                        />
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
@@ -605,9 +739,10 @@ export const AllPages: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-wrap gap-1">
-                      {paper.tags.map(tag => {
-                        // 修正: タグスタイルをgetTagStyle関数を使用して取得
-                        const tagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
+                      {paper.tags.map((tag) => {
+                        const tagStyle =
+                          TAG_COLORS[tag as keyof typeof TAG_COLORS] ||
+                          TAG_COLORS.default;
                         const { bg, text } = tagStyle;
                         return (
                           <span
@@ -624,7 +759,9 @@ export const AllPages: React.FC = () => {
                     {(() => {
                       const difficulty = getDifficultyLabel(paper);
                       return difficulty.label ? (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${difficulty.color}`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${difficulty.color}`}
+                        >
                           {difficulty.label}
                         </span>
                       ) : (
