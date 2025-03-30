@@ -1,5 +1,6 @@
-// services/auth.service.ts
+// src/services/auth.service.ts
 
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import {
     IAuthService,
@@ -7,6 +8,19 @@ import {
     SignUpData,
     User
 } from '../types/auth.types';
+
+// Get the environment variables for the service role client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY;
+
+// Create a service role client for operations that need to bypass RLS
+// This client has admin privileges and should only be used when necessary
+const serverSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+});
 
 /**
  * メールとパスワードでログインする（メール確認チェック付き）
@@ -114,8 +128,8 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
         // メール確認のステータスを確認
         if (authData.user.confirmation_sent_at && !authData.user.confirmed_at) {
             // メール確認が送信されていて、まだ確認されていない場合は成功
-            // ユーザー情報をデータベースに保存
-            const { error: userInsertError } = await supabase
+            // サービスロールクライアントを使用してユーザー情報をデータベースに保存
+            const { error: userInsertError } = await serverSupabase
                 .from('users')
                 .upsert([{
                     id: authData.user.id,
@@ -177,7 +191,8 @@ export const checkEmailConfirmation = async (userId: string): Promise<boolean> =
  */
 export const updateEmailConfirmation = async (userId: string): Promise<void> => {
     try {
-        const { error } = await supabase
+        // サービスロールクライアントを使用してRLSをバイパス
+        const { error } = await serverSupabase
             .from('users')
             .update({ email_confirmed: true })
             .eq('id', userId);
@@ -355,7 +370,7 @@ export const AuthService: IAuthService = {
             }
 
             // ユーザー情報をデータベースに保存
-            const { data: newUserData, error: userInsertError } = await supabase
+            const { data: newUserData, error: userInsertError } = await serverSupabase
                 .from('users')
                 .upsert([{
                     id: authData.user.id,

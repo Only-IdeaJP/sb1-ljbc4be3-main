@@ -30,6 +30,11 @@ export const Login: React.FC = () => {
       HotToast.info('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。');
     }
 
+    // パスワードリセット成功の場合
+    if (params.get('password_reset') === 'success') {
+      HotToast.success('パスワードを変更しました。新しいパスワードでログインしてください。');
+    }
+
     // エラーがある場合
     const errorParam = params.get('error');
     if (errorParam) {
