@@ -1,5 +1,6 @@
 // src/services/email.service.ts
 
+import { serverSupabase } from '../lib/server-supabase';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -9,11 +10,39 @@ import { supabase } from '../lib/supabase';
 export const EmailService = {
     /**
      * パスワードリセット用のメールを送信する
+     * ユーザーの存在確認を行ってから送信します
+     * 
      * @param email メールアドレス
-     * @returns {Promise<{success: boolean, error?: string}>}
+     * @returns {Promise<{success: boolean, error?: string, userExists: boolean}>}
      */
-    async sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    async sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string; userExists: boolean }> {
         try {
+            // まずユーザーが存在するか確認する
+            const { data: existingUser, error: checkError } = await serverSupabase
+                .from('users')
+                .select('id, is_withdrawn')
+                .eq('email', email)
+                .maybeSingle();
+
+            // ユーザーが見つからない場合
+            if (!existingUser) {
+                console.log(`パスワードリセット: 存在しないメールアドレス: ${email}`);
+                return {
+                    success: false,
+                    error: 'このメールアドレスは登録されていません',
+                    userExists: false
+                };
+            }
+
+            // 退会済みユーザーの場合
+            if (existingUser.is_withdrawn) {
+                return {
+                    success: false,
+                    error: 'このアカウントは退会済みです。新規登録が必要です。',
+                    userExists: true
+                };
+            }
+
             // Supabaseのパスワードリセット機能を利用
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${window.location.origin}/reset-password`,
@@ -21,12 +50,13 @@ export const EmailService = {
 
             if (error) throw error;
 
-            return { success: true };
+            return { success: true, userExists: true };
         } catch (error: any) {
             console.error('パスワードリセットメール送信エラー:', error);
             return {
                 success: false,
                 error: error.message || 'パスワードリセットメールの送信に失敗しました',
+                userExists: true // 技術的なエラーの場合は、ユーザーは存在するとみなす
             };
         }
     },
@@ -42,7 +72,7 @@ export const EmailService = {
                 type: 'signup',
                 email,
                 options: {
-                    emailRedirectTo: `http://localhost:5173/confirm-success`,
+                    emailRedirectTo: `${window.location.origin}/confirm-success`,
                 },
             });
 
