@@ -2,7 +2,7 @@
 
 import { RefreshCw } from 'lucide-react';
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { EmailService } from '../services/email.service';
 import { HotToast } from './Toaster';
 
 interface EmailResendButtonProps {
@@ -25,22 +25,14 @@ export const EmailResendButton: React.FC<EmailResendButtonProps> = ({ className 
                 return;
             }
 
-            // リダイレクトURLを設定
-            const redirectTo = `${window.location.origin}/confirm-success`;
+            const result = await EmailService.resendConfirmationEmail(email);
 
-            // Supabaseを使って確認メールを再送信
-            const { error } = await supabase.auth.resend({
-                type: 'signup',
-                email,
-                options: {
-                    emailRedirectTo: redirectTo,
-                }
-            });
-
-            if (error) throw error;
+            if (!result.success) {
+                throw new Error(result.error);
+            }
 
             HotToast.success('確認メールを再送信しました。メールボックスをご確認ください。');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error resending confirmation email:', error);
             HotToast.error('確認メールの再送信に失敗しました。後ほど再度お試しください。');
         } finally {
