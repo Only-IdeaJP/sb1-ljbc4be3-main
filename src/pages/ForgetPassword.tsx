@@ -22,18 +22,33 @@ const ForgetPassword: React.FC = () => {
       return;
     }
 
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+      setError("有効なメールアドレスを入力してください");
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await EmailService.sendPasswordResetEmail(email);
 
       if (!result.success) {
-        throw new Error(result.error);
+        // ユーザー存在チェックのエラーを適切に処理
+        if (!result.userExists) {
+          throw new Error("このメールアドレスは登録されていません。");
+        } else {
+          throw new Error(result.error);
+        }
       }
 
+      // メール送信が成功したら、フィードバックを表示
       setSubmitted(true);
       HotToast.success("パスワードリセット用のメールを送信しました");
     } catch (err: any) {
       setError(err.message || "パスワードリセットメールの送信に失敗しました");
-      HotToast.error("エラーが発生しました");
+      HotToast.error(err.message || "エラーが発生しました");
+
+      // エラーの場合もsubmittedは変更しない（falseのまま）
+      setSubmitted(false);
     } finally {
       setLoading(false);
     }
