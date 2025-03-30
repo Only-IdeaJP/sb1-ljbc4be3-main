@@ -1,6 +1,6 @@
-// pages/EmailConfirmation.tsx
+// src/pages/EmailConfirmation.tsx
 
-import { AlertTriangle, ArrowLeft, CheckCircle, Mail } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Mail } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EmailResendButton } from "../components/EmailResendButton";
@@ -105,56 +105,6 @@ export const EmailConfirmation: React.FC = () => {
                         </Link>
                         してください。
                     </p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-/**
- * メール確認成功ページ
- * メール内のリンクをクリックした後に表示されるページ
- */
-export const EmailConfirmSuccess: React.FC = () => {
-    const navigate = useNavigate();
-    const { user } = useAuth();
-
-    // ユーザーがログイン済みの場合はダッシュボードに遷移
-    useEffect(() => {
-        if (user) {
-            navigate('/', { replace: true });
-        }
-    }, [user, navigate]);
-
-    return (
-        <div className="max-w-3xl mx-auto px-4 py-12">
-            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle className="w-10 h-10 text-green-600" />
-                </div>
-
-                <h1 className="text-2xl font-bold text-gray-900 mb-4">
-                    メール確認が完了しました
-                </h1>
-
-                <p className="text-gray-600 mb-6">
-                    おめでとうございます！メールアドレスの確認が完了しました。<br />
-                    これでサービスの全ての機能をご利用いただけます。
-                </p>
-
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                    <p className="text-green-800">
-                        確認が完了しましたので、ログインして利用を開始してください。
-                    </p>
-                </div>
-
-                <div className="flex justify-center space-x-4">
-                    <Link
-                        to="/login"
-                        className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                        ログインする
-                    </Link>
                 </div>
             </div>
         </div>

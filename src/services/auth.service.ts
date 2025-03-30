@@ -92,7 +92,7 @@ export const signInWithEmailConfirmation = async ({ email, password }: SignInCre
 export const signUpWithEmailConfirmation = async ({ email, password, userData }: SignUpData): Promise<void> => {
     try {
         // リダイレクトURLを設定（メール認証後にリダイレクトされるURL）
-        const redirectTo = `${window.location.origin}/confirm-success`;
+        const redirectTo = `http://localhost:5173/confirm-success`;
 
         // Supabaseの認証にメール確認オプションを指定して新規ユーザーを作成
         const { data: authData, error } = await supabase.auth.signUp({
@@ -151,6 +151,9 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
                 // データ挿入に失敗した場合でも、認証ユーザーは作成されている
                 throw new Error(`ユーザー情報の登録に失敗しました: ${userInsertError.message}`);
             }
+
+            // メールアドレスをローカルストレージに保存（メール再送信用）
+            localStorage.setItem('pending_email', email);
 
             return;
         } else if (authData.user.confirmed_at) {

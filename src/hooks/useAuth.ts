@@ -1,4 +1,4 @@
-// hooks/useAuth.ts を更新
+// hooks/useAuth.ts
 
 import { HotToast } from '../components/Toaster';
 import { signInWithEmailConfirmation, signUpWithEmailConfirmation } from '../services/auth.service';

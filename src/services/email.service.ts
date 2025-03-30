@@ -42,7 +42,7 @@ export const EmailService = {
                 type: 'signup',
                 email,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/confirm-success`,
+                    emailRedirectTo: `http://localhost:5173/confirm-success`,
                 },
             });
 
@@ -54,6 +54,56 @@ export const EmailService = {
             return {
                 success: false,
                 error: error.message || '確認メールの再送信に失敗しました',
+            };
+        }
+    },
+
+    /**
+     * メールアドレスの確認状態を更新する
+     * @param userId ユーザーID
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async updateEmailConfirmation(userId: string): Promise<{ success: boolean; error?: string }> {
+        try {
+            // ユーザーテーブルの email_confirmed フラグを更新
+            const { error } = await supabase
+                .from('users')
+                .update({ email_confirmed: true })
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            return { success: true };
+        } catch (error: any) {
+            console.error('メール確認状態更新エラー:', error);
+            return {
+                success: false,
+                error: error.message || 'メール確認状態の更新に失敗しました',
+            };
+        }
+    },
+
+    /**
+     * メールアドレスの確認状態を取得する
+     * @param userId ユーザーID
+     * @returns {Promise<{confirmed: boolean, error?: string}>}
+     */
+    async checkEmailConfirmation(userId: string): Promise<{ confirmed: boolean; error?: string }> {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('email_confirmed')
+                .eq('id', userId)
+                .single();
+
+            if (error) throw error;
+
+            return { confirmed: data?.email_confirmed || false };
+        } catch (error: any) {
+            console.error('メール確認状態取得エラー:', error);
+            return {
+                confirmed: false,
+                error: error.message || 'メール確認状態の取得に失敗しました',
             };
         }
     }
