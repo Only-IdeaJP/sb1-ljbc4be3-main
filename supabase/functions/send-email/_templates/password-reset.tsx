@@ -14,7 +14,7 @@ import {
 } from 'npm:@react-email/components@0.0.22'
 import * as React from 'npm:react@18.3.1'
 
-interface SignUpEmailProps {
+interface PasswordResetEmailProps {
     supabase_url: string
     email_action_type: string
     redirect_to: string
@@ -22,26 +22,26 @@ interface SignUpEmailProps {
     token: string
 }
 
-export const SignUpEmail = ({
+export const PasswordResetEmail = ({
     token,
     supabase_url,
     email_action_type,
     redirect_to,
     token_hash,
-}: SignUpEmailProps) => {
-    // 確認用のURL
-    const confirmationUrl = `${supabase_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}`;
+}: PasswordResetEmailProps) => {
+    // リセットリンクのURL
+    const resetUrl = `${supabase_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}`;
 
     return (
         <Html>
             <Head />
-            <Preview>ペーパー管理くんへようこそ！アカウント確認のご案内</Preview>
+            <Preview>ペーパー管理くん - パスワードリセットのご案内</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* ロゴ部分 */}
                     <Section style={logoContainer}>
                         <Img
-                            src="https://mrpapermanagement.com/images/pelican-logo2.png"
+                            src="https://i.ibb.co/K9RBnPL/pelican-logo2.png"
                             width="60"
                             height="60"
                             alt="ペーパー管理くん"
@@ -51,16 +51,16 @@ export const SignUpEmail = ({
                     </Section>
 
                     <Section style={section}>
-                        <Heading style={h1}>アカウント確認のご案内</Heading>
+                        <Heading style={h1}>パスワードリセットのご案内</Heading>
                         <Text style={text}>
-                            この度は、ペーパー管理くんにご登録いただき誠にありがとうございます。下記のボタンをクリックして、アカウント登録を完了させてください。
+                            パスワードのリセットをリクエストいただきました。以下のボタンをクリックして、新しいパスワードを設定してください。
                         </Text>
 
                         <Button
-                            href={confirmationUrl}
+                            href={resetUrl}
                             style={button}
                         >
-                            アカウントを確認する
+                            パスワードを再設定する
                         </Button>
 
                         <Text style={noteText}>
@@ -68,17 +68,24 @@ export const SignUpEmail = ({
                         </Text>
                         <Text style={linkText}>
                             <Link
-                                href={confirmationUrl}
+                                href={resetUrl}
                                 style={link}
                             >
-                                {confirmationUrl}
+                                {resetUrl}
                             </Link>
+                        </Text>
+
+                        <Text style={noteText}>
+                            または、こちらの一時的なコードを使用してください：
+                        </Text>
+                        <Text style={codeText}>
+                            <code style={code}>{token}</code>
                         </Text>
 
                         <Hr style={hr} />
 
                         <Text style={footerText}>
-                            このメールに心当たりがない場合は、このメールを無視していただいて構いません。
+                            このパスワードのリセットをリクエストしていない場合は、このメールを無視していただいて構いません。あなたのアカウントは安全です。
                         </Text>
                     </Section>
 
@@ -93,7 +100,7 @@ export const SignUpEmail = ({
     )
 }
 
-export default SignUpEmail
+export default PasswordResetEmail
 
 // スタイル定義
 const main = {
@@ -167,14 +174,14 @@ const noteText = {
     color: '#666',
     fontSize: '14px',
     lineHeight: '21px',
-    marginTop: '32px',
+    marginTop: '24px',
     textAlign: 'center' as const,
 }
 
 const linkText = {
     fontSize: '14px',
     lineHeight: '21px',
-    margin: '12px 0 32px',
+    margin: '12px 0',
     textAlign: 'center' as const,
     wordBreak: 'break-all' as const,
 }
@@ -182,6 +189,25 @@ const linkText = {
 const link = {
     color: '#4338ca',
     textDecoration: 'underline',
+}
+
+const codeText = {
+    textAlign: 'center' as const,
+    margin: '16px 0 24px',
+}
+
+const code = {
+    display: 'inline-block',
+    padding: '16px 4.5%',
+    width: '70%',
+    backgroundColor: '#f4f4f9',
+    borderRadius: '5px',
+    border: '1px solid #eee',
+    color: '#333',
+    fontSize: '15px',
+    textAlign: 'center' as const,
+    fontFamily: 'monospace',
+    letterSpacing: '2px',
 }
 
 const hr = {
