@@ -31,7 +31,7 @@ export const Login: React.FC = () => {
     }
 
     // パスワードリセット成功の場合
-    if (params.get('password_reset') === 'success') {
+    if (params.get('password_reset_complete') === 'true') {
       HotToast.success('パスワードを変更しました。新しいパスワードでログインしてください。');
     }
 

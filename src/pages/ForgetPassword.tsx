@@ -1,15 +1,25 @@
 // src/pages/ForgetPassword.tsx
 import { ArrowLeft, Mail, Send } from "lucide-react";
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
-import { EmailService } from "../services/email.service";
+import { supabase } from "../lib/supabase";
 
 const ForgetPassword: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  // カウントダウンのハンドリング
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,29 +39,43 @@ const ForgetPassword: React.FC = () => {
     }
 
     try {
-      const result = await EmailService.sendPasswordResetEmail(email);
+      // ユーザーチェックをスキップして、直接パスワードリセットメールを送信します
+      // このアプローチでは、アカウントの存在を確認しませんが、
+      // リクエストされたメールアドレスがデータベースに存在する場合のみ、Supabaseはメールを送信します
 
-      if (!result.success) {
-        // ユーザー存在チェックのエラーを適切に処理
-        if (!result.userExists) {
-          throw new Error("このメールアドレスは登録されていません。");
-        } else {
-          throw new Error(result.error);
-        }
+      console.log("Sending password reset email to:", email);
+
+      // パスワードリセットメールを送信
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) {
+        console.error("Password reset API error:", resetError);
+        throw resetError;
       }
 
-      // メール送信が成功したら、フィードバックを表示
+      // 成功メッセージを表示
       setSubmitted(true);
+      setCountdown(60); // 60秒のカウントダウンを開始
       HotToast.success("パスワードリセット用のメールを送信しました");
-    } catch (err: any) {
-      setError(err.message || "パスワードリセットメールの送信に失敗しました");
-      HotToast.error(err.message || "エラーが発生しました");
 
-      // エラーの場合もsubmittedは変更しない（falseのまま）
-      setSubmitted(false);
+    } catch (err: any) {
+      console.error("Password reset request failed:", err);
+
+      // エラーメッセージをユーザーに表示
+      // セキュリティのため、メールが存在するかどうかを明示しない
+      setError("パスワードリセットメールの送信に失敗しました。入力したメールアドレスをご確認ください。");
+      HotToast.error("エラーが発生しました");
     } finally {
       setLoading(false);
     }
+  };
+
+  // メール再送信
+  const handleResend = () => {
+    if (countdown > 0) return;
+    handleSubmit(new Event('submit') as any);
   };
 
   return (
@@ -91,24 +115,25 @@ const ForgetPassword: React.FC = () => {
           </div>
         )}
 
-        {!submitted ? (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                メールアドレス
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@example.com"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              メールアドレス
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@example.com"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              required
+              disabled={submitted && countdown > 0}
+            />
+          </div>
 
-            <div>
+          <div>
+            {!submitted ? (
               <button
                 type="submit"
                 disabled={loading}
@@ -145,18 +170,33 @@ const ForgetPassword: React.FC = () => {
                   </>
                 )}
               </button>
-            </div>
-          </form>
-        ) : (
-          <div className="text-center">
-            <Link
-              to="/login"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              ログイン画面に戻る
-            </Link>
+            ) : (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={countdown > 0 || loading}
+                  className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>送信中...</>
+                  ) : countdown > 0 ? (
+                    <>再送信 ({countdown}秒後に再試行可能)</>
+                  ) : (
+                    <>メールを再送信</>
+                  )}
+                </button>
+
+                <Link
+                  to="/login"
+                  className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  ログイン画面に戻る
+                </Link>
+              </div>
+            )}
           </div>
-        )}
+        </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
@@ -167,6 +207,18 @@ const ForgetPassword: React.FC = () => {
             してください。
           </p>
         </div>
+
+        {submitted && (
+          <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">メールが届かない場合：</h3>
+            <ul className="text-sm text-blue-700 space-y-1 list-disc pl-5">
+              <li>迷惑メールフォルダを確認してください</li>
+              <li>メールアドレスの入力に誤りがないか確認してください</li>
+              <li>数分待ってからもう一度お試しください</li>
+              <li>それでも問題が解決しない場合は、別のメールアドレスで新規登録をお試しください</li>
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

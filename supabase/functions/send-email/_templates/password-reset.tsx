@@ -41,7 +41,7 @@ export const PasswordResetEmail = ({
                     {/* ロゴ部分 */}
                     <Section style={logoContainer}>
                         <Img
-                            src="https://i.ibb.co/K9RBnPL/pelican-logo2.png"
+                            src="https://mrpapermanagement.com/images/pelican-logo2.png"
                             width="60"
                             height="60"
                             alt="ペーパー管理くん"
@@ -73,13 +73,6 @@ export const PasswordResetEmail = ({
                             >
                                 {resetUrl}
                             </Link>
-                        </Text>
-
-                        <Text style={noteText}>
-                            または、こちらの一時的なコードを使用してください：
-                        </Text>
-                        <Text style={codeText}>
-                            <code style={code}>{token}</code>
                         </Text>
 
                         <Hr style={hr} />
