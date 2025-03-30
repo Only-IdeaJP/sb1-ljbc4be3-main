@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     // メール送信
     console.log(`メール送信中: ${email_action_type} - 送信先: ${user.email}`);
     const { error } = await resend.emails.send({
-      from: "team@only-idea.com",
+      from: "ペーパー管理くん <team@only-idea.com>",
       to: [user.email],
       subject: emailSubject,
       html: emailHtml,

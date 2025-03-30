@@ -1,5 +1,5 @@
 // src/pages/PasswordReset.tsx
-import { CheckCircle, Eye, EyeOff, Lock, RefreshCw } from "lucide-react";
+import { CheckCircle, Eye, EyeOff, Lock } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
@@ -10,17 +10,13 @@ const PasswordReset: React.FC = () => {
     const location = useLocation();
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [userEmail, setUserEmail] = useState("");
-    const [manualToken, setManualToken] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
-
-    // リンクがすでに期限切れかどうかを示すフラグ
-    const [isTokenExpired, setIsTokenExpired] = useState(false);
+    const [tokenVerified, setTokenVerified] = useState(false);
 
     // パスワードのバリデーション
     const passwordValidation = {
@@ -29,49 +25,55 @@ const PasswordReset: React.FC = () => {
         match: password === confirmPassword,
     };
 
-    // URLからエラー情報を取得
+    // 初期化時の処理 - URLパラメータやハッシュからアクセストークンを取得し検証する
     useEffect(() => {
-        const checkForErrors = () => {
-            // URLからエラーパラメータを取得
-            const hash = location.hash.replace('#', '');
-            const searchParams = new URLSearchParams(hash);
-
-            // エラーコードを確認
-            const errorCode = searchParams.get('error_code');
-            const errorDescription = searchParams.get('error_description');
-
-            console.log("URL error parameters:", { errorCode, errorDescription });
-
-            // トークンが期限切れかどうか確認
-            if (errorCode === 'otp_expired' || (errorDescription && errorDescription.includes('expired'))) {
-                console.log("Detected expired token in URL");
-                setIsTokenExpired(true);
-                setError("パスワードリセットリンクの有効期限が切れています。新しいリセットリンクをリクエストするか、メールに記載されているリカバリーコードを使用してください。");
-            }
-        };
-
-        checkForErrors();
-    }, [location]);
-
-    // 初期化時の処理
-    useEffect(() => {
-        const init = async () => {
+        const initAuth = async () => {
             try {
-                // セッションを確認して、あれば自動的にログアウト
-                const { data } = await supabase.auth.getSession();
-                if (data.session) {
-                    console.log("Found existing session, signing out first");
-                    await supabase.auth.signOut();
+                // URLハッシュやクエリからパラメータを取得
+                const fragment = location.hash.substring(1);
+                const params = new URLSearchParams(fragment || location.search);
+
+                // アクセストークンの確認 - URLハッシュから
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const type = params.get('type');
+
+                // 既存のセッションを確認
+                const { data: sessionData } = await supabase.auth.getSession();
+
+                console.log("URL params:", { accessToken, refreshToken, type });
+                console.log("Session data:", sessionData);
+
+                if (accessToken) {
+                    // トークンがあればセッションを作成
+                    const { error } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken || '',
+                    });
+
+                    if (error) {
+                        console.error("Error setting session:", error);
+                        setError("セッションの設定に失敗しました。新しいパスワードリセットリンクをリクエストしてください。");
+                    } else {
+                        setTokenVerified(true);
+                    }
+                } else if (sessionData.session) {
+                    // 既存のセッションが有効な場合
+                    setTokenVerified(true);
+                } else {
+                    // セッションがない、トークンも無効
+                    setError("有効なリカバリーリンクではありません。新しいパスワードリセットリンクをリクエストしてください。");
                 }
             } catch (err) {
                 console.error("Error during initialization:", err);
+                setError("認証の初期化中にエラーが発生しました。");
             } finally {
                 setInitialLoading(false);
             }
         };
 
-        init();
-    }, []);
+        initAuth();
+    }, [location]);
 
     // パスワードリセット処理
     const handleSubmit = async (e: React.FormEvent) => {
@@ -94,36 +96,10 @@ const PasswordReset: React.FC = () => {
             return;
         }
 
-        // メールアドレスバリデーション
-        if (!userEmail || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(userEmail)) {
-            setError("有効なメールアドレスを入力してください");
-            return;
-        }
-
-        // リカバリーコードのバリデーション
-        if (!manualToken) {
-            setError("リカバリーコードを入力してください");
-            return;
-        }
-
         setLoading(true);
 
         try {
-            // ステップ1: リカバリーコードでの認証
-            console.log("Attempting password recovery with token");
-            const { error: otpError } = await supabase.auth.verifyOtp({
-                email: userEmail,
-                token: manualToken,
-                type: 'recovery'
-            });
-
-            if (otpError) {
-                console.error("OTP verification error:", otpError);
-                throw new Error("リカバリーコードが無効または期限切れです。新しいパスワードリセットをリクエストしてください。");
-            }
-
-            // ステップ2: パスワードの更新
-            console.log("OTP verified, updating password");
+            // トークンでの認証が確認できていれば、パスワードを更新
             const { error: updateError } = await supabase.auth.updateUser({
                 password: password
             });
@@ -180,37 +156,28 @@ const PasswordReset: React.FC = () => {
         );
     }
 
-    // トークンが期限切れの場合の表示
-    if (isTokenExpired && !success) {
+    // トークンが検証されていない場合の表示
+    if (!tokenVerified && !success) {
         return (
             <div className="max-w-md mx-auto px-4 py-12">
                 <div className="bg-white rounded-lg shadow-sm p-8">
                     <div className="text-center mb-8">
                         <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <RefreshCw className="h-8 w-8 text-yellow-600" />
+                            <Lock className="h-8 w-8 text-yellow-600" />
                         </div>
                         <h1 className="text-2xl font-bold text-gray-900">
-                            リンクの有効期限が切れています
+                            認証に問題があります
                         </h1>
                         <p className="text-gray-600 mt-4 mb-6">
-                            パスワードリセットリンクの有効期限が切れています。新しいリセットリンクをリクエストするか、メールに記載されているリカバリーコードを使用してください。
+                            {error || "パスワードリセットリンクが無効か期限切れです。新しいリセットリンクをリクエストしてください。"}
                         </p>
 
-                        <div className="flex flex-col items-center space-y-4">
-                            <button
-                                onClick={() => setIsTokenExpired(false)}
-                                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            >
-                                リカバリーコードを使用する
-                            </button>
-
-                            <button
-                                onClick={handleRequestNewReset}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            >
-                                新しいリセットリンクをリクエスト
-                            </button>
-                        </div>
+                        <button
+                            onClick={handleRequestNewReset}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            新しいリセットリンクをリクエスト
+                        </button>
                     </div>
                 </div>
             </div>
@@ -223,8 +190,8 @@ const PasswordReset: React.FC = () => {
             <div className="max-w-md mx-auto px-4 py-12">
                 <div className="bg-white rounded-lg shadow-sm p-8">
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Lock className="h-8 w-8 text-indigo-600" />
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <CheckCircle className="h-8 w-8 text-green-600" />
                         </div>
                         <h1 className="text-2xl font-bold text-gray-900">
                             パスワードの更新が完了しました
@@ -237,7 +204,6 @@ const PasswordReset: React.FC = () => {
                     </div>
 
                     <div className="mt-6 text-center bg-green-50 p-4 rounded-lg">
-                        <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
                         <p className="text-green-700">
                             パスワードの更新が完了しました。
                             <br />
@@ -260,53 +226,17 @@ const PasswordReset: React.FC = () => {
                         新しいパスワードを設定
                     </h1>
                     <p className="text-gray-600 mt-2">
-                        メールに記載されているリカバリーコードを使用して、新しいパスワードを設定してください。
+                        以下のフォームで新しいパスワードを設定してください。
                     </p>
                 </div>
 
                 {error && (
-                    <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                        <p className="text-yellow-700">{error}</p>
+                    <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+                        <p className="text-red-700">{error}</p>
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label htmlFor="recovery-email" className="block text-sm font-medium text-gray-700 mb-1">
-                            メールアドレス
-                        </label>
-                        <input
-                            type="email"
-                            id="recovery-email"
-                            value={userEmail}
-                            onChange={(e) => setUserEmail(e.target.value)}
-                            placeholder="登録したメールアドレスを入力"
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                        <p className="mt-1 text-xs text-gray-500">
-                            パスワードリセットを申請したメールアドレスを入力してください
-                        </p>
-                    </div>
-
-                    <div>
-                        <label htmlFor="recovery-token" className="block text-sm font-medium text-gray-700 mb-1">
-                            リカバリーコード
-                        </label>
-                        <input
-                            type="text"
-                            id="recovery-token"
-                            value={manualToken}
-                            onChange={(e) => setManualToken(e.target.value)}
-                            placeholder="メールに記載されているコードを入力"
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                        <p className="mt-1 text-xs text-gray-500">
-                            メールに記載されているリカバリーコードを入力してください
-                        </p>
-                    </div>
-
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                             新しいパスワード
@@ -335,13 +265,13 @@ const PasswordReset: React.FC = () => {
                         </div>
                         <div className="mt-2 flex items-center">
                             <div
-                                className={`w-3 h-3 rounded-full mr-2 ${passwordValidation.length ? "bg-green-500" : "bg-gray-300"}`}
+                                className={`w-3 h-3 rounded-full mr-2 ${password.length >= 8 ? "bg-green-500" : "bg-gray-300"}`}
                             ></div>
                             <span className="text-xs text-gray-600">8文字以上</span>
                         </div>
                         <div className="mt-1 flex items-center">
                             <div
-                                className={`w-3 h-3 rounded-full mr-2 ${passwordValidation.ascii ? "bg-green-500" : "bg-gray-300"}`}
+                                className={`w-3 h-3 rounded-full mr-2 ${password && /^[\x00-\x7F]*$/.test(password) ? "bg-green-500" : "bg-gray-300"}`}
                             ></div>
                             <span className="text-xs text-gray-600">半角英数字記号のみ</span>
                         </div>
@@ -375,7 +305,7 @@ const PasswordReset: React.FC = () => {
                         </div>
                         <div className="mt-2 flex items-center">
                             <div
-                                className={`w-3 h-3 rounded-full mr-2 ${passwordValidation.match && password ? "bg-green-500" : "bg-gray-300"}`}
+                                className={`w-3 h-3 rounded-full mr-2 ${password && confirmPassword && password === confirmPassword ? "bg-green-500" : "bg-gray-300"}`}
                             ></div>
                             <span className="text-xs text-gray-600">パスワードが一致</span>
                         </div>
@@ -384,7 +314,7 @@ const PasswordReset: React.FC = () => {
                     <div>
                         <button
                             type="submit"
-                            disabled={loading || !userEmail || !manualToken || !password || !confirmPassword}
+                            disabled={loading}
                             className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
                         >
                             {loading ? (
@@ -417,21 +347,6 @@ const PasswordReset: React.FC = () => {
                         </button>
                     </div>
                 </form>
-
-                <div className="mt-6">
-                    <div className="border-t border-gray-200 my-4"></div>
-                    <p className="text-center text-sm text-gray-600 mb-2">
-                        リカバリーコードをお持ちでない場合や期限切れの場合は、新しいパスワードリセットをリクエストしてください。
-                    </p>
-                    <div className="text-center">
-                        <Link
-                            to="/forget-password"
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mt-2"
-                        >
-                            パスワードリセットを再リクエスト
-                        </Link>
-                    </div>
-                </div>
 
                 <div className="mt-6 text-center">
                     <p className="text-sm text-gray-600">

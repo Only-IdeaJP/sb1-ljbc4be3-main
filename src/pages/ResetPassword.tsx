@@ -45,16 +45,34 @@ const ResetPassword: React.FC = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      // トークンでの認証が確認できていれば、パスワードを更新
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password
+      });
 
-      if (error) throw error;
+      if (updateError) {
+        console.error("Password update error:", updateError);
+        throw new Error("パスワードの更新に失敗しました: " + updateError.message);
+      }
 
+      // 成功
       setSuccess(true);
+
+      // 成功メッセージは一度だけ表示する - HotToastだけ使用
       HotToast.success("パスワードを更新しました");
 
-      // 3秒後にログイン画面へリダイレクト
-      setTimeout(() => {
-        navigate("/login?password_reset=success");
+      // 3秒後にログアウトしてログイン画面へリダイレクト
+      setTimeout(async () => {
+        try {
+          // 明示的にログアウト
+          await supabase.auth.signOut();
+          console.log("Successfully signed out after password reset");
+        } catch (err) {
+          console.error("Error signing out:", err);
+        } finally {
+          // パラメータを変更してリダイレクト（ユーザーにトーストメッセージが重複して表示されないように）
+          navigate("/login?password_reset_complete=true");
+        }
       }, 3000);
     } catch (err: any) {
       console.error("Password reset error:", err);
