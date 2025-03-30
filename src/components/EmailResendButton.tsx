@@ -1,4 +1,4 @@
-// components/EmailResendButton.tsx
+// src/components/EmailResendButton.tsx
 
 import { RefreshCw } from 'lucide-react';
 import React, { useState } from 'react';

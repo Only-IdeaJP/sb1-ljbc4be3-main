@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChildBirthSelector } from '../../../components/form/ChildBirthSelector';
 import { useAuth } from '../../../hooks/useAuth';
 import { AuthService } from '../../../services/auth.service';
+
 interface RegisterFormProps {
     onToggleForm: () => void;
 }
