@@ -92,7 +92,7 @@ export const signInWithEmailConfirmation = async ({ email, password }: SignInCre
 export const signUpWithEmailConfirmation = async ({ email, password, userData }: SignUpData): Promise<void> => {
     try {
         // リダイレクトURLを設定（メール認証後にリダイレクトされるURL）
-        const redirectTo = `http://localhost:5173/confirm-success`;
+        const redirectTo = `https://sb1-ljbc4be3-main-pacgcfbfh-onlyideas-projects.vercel.app/confirm-success`;
 
         // Supabaseの認証にメール確認オプションを指定して新規ユーザーを作成
         const { data: authData, error } = await supabase.auth.signUp({
