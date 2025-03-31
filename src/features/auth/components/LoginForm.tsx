@@ -1,10 +1,10 @@
-// src/features/auth/components/LoginForm.tsx
-
+// features/auth/components/LoginForm.tsx
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { AuthService } from '../../../services/auth.service';
+import { handleSupabaseError } from '../../../utils/errorHandler'; // エラーハンドラをインポート
 
 interface LoginFormProps {
     onToggleForm: () => void;
@@ -78,10 +78,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
             }, 300);
         } catch (err) {
             console.error('Login error:', err);
-            const errorMessage = err instanceof Error ? err.message : '予期せぬエラーが発生しました';
+
+            // エラーメッセージを日本語に変換
+            const errorMessage = handleSupabaseError(err);
 
             // メール確認エラーを検出
-            if (errorMessage.includes('メールアドレスの確認が完了していません')) {
+            if (errorMessage.includes('メールアドレスが確認されていません') ||
+                errorMessage.includes('メールアドレスの確認が完了していません')) {
                 setIsEmailConfirmationError(true);
             }
 

@@ -1,10 +1,10 @@
 // src/pages/PasswordReset.tsx
-
 import { CheckCircle, Eye, EyeOff, Lock } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
 import { supabase } from "../lib/supabase";
+import { handleSupabaseError } from "../utils/errorHandler"; // エラーハンドラをインポート
 
 const PasswordReset: React.FC = () => {
     const navigate = useNavigate();
@@ -54,7 +54,9 @@ const PasswordReset: React.FC = () => {
 
                     if (error) {
                         console.error("Error setting session:", error);
-                        setError("セッションの設定に失敗しました。新しいパスワードリセットリンクをリクエストしてください。");
+                        // エラーメッセージを日本語に変換
+                        const errorMessage = handleSupabaseError(error);
+                        setError(errorMessage);
                     } else {
                         setTokenVerified(true);
                     }
@@ -67,7 +69,9 @@ const PasswordReset: React.FC = () => {
                 }
             } catch (err) {
                 console.error("Error during initialization:", err);
-                setError("認証の初期化中にエラーが発生しました。");
+                // エラーメッセージを日本語に変換
+                const errorMessage = handleSupabaseError(err);
+                setError(errorMessage);
             } finally {
                 setInitialLoading(false);
             }
@@ -100,14 +104,14 @@ const PasswordReset: React.FC = () => {
         setLoading(true);
 
         try {
-            // パスワードを更新
+            // トークンでの認証が確認できていれば、パスワードを更新
             const { error: updateError } = await supabase.auth.updateUser({
                 password: password
             });
 
             if (updateError) {
                 console.error("Password update error:", updateError);
-                throw new Error("パスワードの更新に失敗しました: " + updateError.message);
+                throw updateError;
             }
 
             // 成功
@@ -119,10 +123,12 @@ const PasswordReset: React.FC = () => {
                 // パラメータを変更してリダイレクト（ユーザーにトーストメッセージが重複して表示されないように）
                 navigate("/", { replace: true });
             }, 3000);
-        } catch (err: any) {
+        } catch (err) {
             console.error("Password reset error:", err);
-            setError(err.message || "パスワードのリセットに失敗しました");
-            HotToast.error("エラーが発生しました");
+            // エラーメッセージを日本語に変換
+            const errorMessage = handleSupabaseError(err);
+            setError(errorMessage);
+            HotToast.error(errorMessage);
         } finally {
             setLoading(false);
         }

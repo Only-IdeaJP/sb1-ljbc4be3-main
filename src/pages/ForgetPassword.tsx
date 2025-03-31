@@ -1,12 +1,12 @@
 // src/pages/ForgetPassword.tsx
 import { ArrowLeft, Mail, Send } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
 import { supabase } from "../lib/supabase";
+import { handleSupabaseError } from "../utils/errorHandler"; // エラーハンドラをインポート
 
 const ForgetPassword: React.FC = () => {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -60,12 +60,15 @@ const ForgetPassword: React.FC = () => {
       setCountdown(60); // 60秒のカウントダウンを開始
       HotToast.success("パスワードリセット用のメールを送信しました");
 
-    } catch (err: any) {
+    } catch (err) {
       console.error("Password reset request failed:", err);
+
+      // エラーメッセージを日本語に変換
+      const errorMessage = handleSupabaseError(err);
 
       // エラーメッセージをユーザーに表示
       // セキュリティのため、メールが存在するかどうかを明示しない
-      setError("パスワードリセットメールの送信に失敗しました。入力したメールアドレスをご確認ください。");
+      setError(errorMessage);
       HotToast.error("エラーが発生しました");
     } finally {
       setLoading(false);

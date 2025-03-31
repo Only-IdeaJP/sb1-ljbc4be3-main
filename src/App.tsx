@@ -37,7 +37,7 @@ const App: React.FC = () => {
   // ↓↓↓ Supabaseの自動サインアウトを防ぐための重要な修正 ↓↓↓
   useEffect(() => {
     // 認証イベントリスナーの設定
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _) => {
       console.log(`Auth event: ${event}`);
 
       // SIGNED_OUTイベントを検知した場合、それが/confirm-successページからの場合は
