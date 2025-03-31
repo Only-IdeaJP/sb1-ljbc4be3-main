@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx の重要な修正部分
 
 import React, { useEffect } from "react";
 import {
@@ -34,43 +34,46 @@ import UploadPapers from "./pages/UploadPapers";
 const App: React.FC = () => {
   const { user, loading } = useAuth();
 
-  // Supabaseのハッシュパラメータを処理
-
+  // ↓↓↓ Supabaseの自動サインアウトを防ぐための重要な修正 ↓↓↓
   useEffect(() => {
-    const handleEmailConfirmation = async () => {
-      // Check for sign-up confirmation
-      if (window.location.href.includes('type=signup')) {
-        console.log("Detected signup confirmation in URL");
+    // 認証イベントリスナーの設定
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`Auth event: ${event}`);
 
-        // Get session information
-        const { data, error } = await supabase.auth.getSession();
+      // SIGNED_OUTイベントを検知した場合、それが/confirm-successページからの場合は
+      // サインアウトをキャンセルするためにセッションを復元する
+      if (event === 'SIGNED_OUT' && window.location.pathname === '/confirm-success') {
+        console.log('Preventing automatic sign out on confirmation page');
 
-        if (error) {
-          console.error("Session error during confirmation:", error);
-          return;
-        }
+        // URLからトークンを取得（ハッシュまたはクエリパラメータから）
+        const fragment = window.location.hash.substring(1);
+        const params = new URLSearchParams(fragment || window.location.search);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
 
-        if (data.session?.user) {
-          console.log("User is authenticated after email confirmation:", data.session.user.id);
-
-          // Update the email_confirmed flag
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({ email_confirmed: true })
-            .eq('id', data.session.user.id);
-
-          if (updateError) {
-            console.error("Failed to update email_confirmed status:", updateError);
-          } else {
-            console.log("Successfully updated email_confirmed status");
-            // Removed the toast notification from here
-          }
+        // トークンがある場合はセッションを復元
+        if (accessToken) {
+          console.log('Attempting to restore session from token');
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          }).then(({ data, error }) => {
+            if (error) {
+              console.error('Failed to restore session:', error);
+            } else if (data.session) {
+              console.log('Session successfully restored');
+            }
+          });
         }
       }
-    };
+    });
 
-    handleEmailConfirmation();
+    // クリーンアップ関数
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+  // ↑↑↑ 重要な修正の終了 ↑↑↑
 
   // Show loading spinner while checking auth status
   if (loading) {
