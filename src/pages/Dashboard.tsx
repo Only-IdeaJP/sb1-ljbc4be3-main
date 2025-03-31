@@ -1,19 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
+// src/pages/Dashboard.tsx
+
+import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
 
-import NonLoggedInUserContent from "../components/content/NonLoggedInUserContent";
 import LoggedInUserContent from "../components/content/LoggedInUserContent";
+import NonLoggedInUserContent from "../components/content/NonLoggedInUserContent";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface Paper {
-  id: string;
-  user_id: string;
-  next_practice_date?: string;
-  last_practiced?: string;
-  is_correct?: boolean;
-  tags?: string[];
-}
 
 interface Stats {
   totalPapers: number;
@@ -30,9 +23,15 @@ interface Stats {
 }
 
 export const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [contentKey, setContentKey] = useState(0); // コンポーネントを強制的に再レンダリングするためのキー
+
+  // 認証状態が変更されたらコンテンツキーを更新して再レンダリングを強制
+  useEffect(() => {
+    setContentKey(prev => prev + 1);
+  }, [user]);
 
   const fetchStats = useCallback(async () => {
     if (!user) {
@@ -132,10 +131,17 @@ export const Dashboard: React.FC = () => {
       setLoading(false);
     }
   }, [user]);
+
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+  }, [fetchStats, contentKey]); // contentKeyが変更されたときにも統計情報を再取得
 
+  // 認証ローディング中は単純なローディング表示
+  if (authLoading) {
+    return <p className="text-center text-gray-500">Loading...</p>;
+  }
+
+  // ユーザー状態に基づいて適切なコンテンツを表示
   if (!user) {
     return <NonLoggedInUserContent />;
   }

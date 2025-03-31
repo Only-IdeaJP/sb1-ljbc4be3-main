@@ -1,7 +1,8 @@
-// src/hooks/useAuth.ts
+// src/hooks/useAuth.ts の改善部分
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { HotToast } from '../components/Toaster';
+import { supabase } from '../lib/supabase';
 import {
   signOut as authSignOut,
   updatePassword as authUpdatePassword,
@@ -22,8 +23,33 @@ export const useAuth = () => {
     loading,
     error,
     signOut: storeSignOut,
-    updatePassword: storeUpdatePassword
+    updatePassword: storeUpdatePassword,
+    setUser,
+    initialize
   } = useAuthStore();
+
+  // セッション変更を監視して状態を同期する
+  useEffect(() => {
+    // 認証状態の変更を監視
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`Auth event: ${event}`);
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // セッションがあれば、ユーザー情報を再取得
+        if (session?.user) {
+          // ストアの初期化関数を呼び出して最新のユーザー情報を取得
+          initialize().catch(err => {
+            console.error("Error initializing auth state after sign in:", err);
+          });
+        }
+      }
+    });
+
+    // クリーンアップ関数
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [initialize]);
 
   /**
    * メール確認状態を更新する
@@ -51,14 +77,15 @@ export const useAuth = () => {
     try {
       const success = await setUserSession(accessToken, refreshToken);
       if (success) {
-        HotToast.success('セッションが復元されました');
+        // セッションを設定したら、ユーザー情報も更新
+        await initialize();
       }
       return success;
     } catch (error) {
       console.error('Error restoring session:', error);
       return false;
     }
-  }, []);
+  }, [initialize]);
 
   /**
    * メール確認状態を確認
@@ -73,6 +100,42 @@ export const useAuth = () => {
     }
   }, []);
 
+  /**
+   * ログイン処理
+   * @param email メールアドレス
+   * @param password パスワード
+   */
+  const signIn = useCallback(async (email: string, password: string): Promise<void> => {
+    try {
+      // メール確認済みのユーザーのみログイン可能
+      const userData = await signInWithEmailConfirmation({ email, password });
+
+      // ユーザー情報を更新
+      setUser(userData);
+
+      console.log('ログインしました');
+      HotToast.success('ログインしました');
+
+      // 強制的にページリロードせずに状態を更新する対策
+      // ちょっと遅延させてからユーザー情報を再更新（UIが反映される時間を確保）
+      setTimeout(() => {
+        initialize().catch(err => {
+          console.error("Error refreshing user data after login:", err);
+        });
+      }, 100);
+    } catch (error) {
+      // メール確認エラーの場合は特別なメッセージを表示
+      if (error instanceof Error &&
+        error.message.includes('メールアドレスの確認が完了していません')) {
+        HotToast.error('メールアドレスの確認が必要です。メールの確認リンクをクリックしてください。');
+      } else {
+        HotToast.error(error instanceof Error ? error.message : 'ログインに失敗しました');
+      }
+      // エラーを上位に伝播させる
+      throw error;
+    }
+  }, [initialize, setUser]);
+
   return {
     user,
     loading,
@@ -81,30 +144,7 @@ export const useAuth = () => {
     confirmEmail,
     restoreSession,
     checkEmailConfirmed,
-
-    /**
-     * ログイン処理
-     * @param email メールアドレス
-     * @param password パスワード
-     */
-    signIn: async (email: string, password: string): Promise<void> => {
-      try {
-        // メール確認済みのユーザーのみログイン可能
-        await signInWithEmailConfirmation({ email, password });
-        console.log('ログインしました');
-        HotToast.success('ログインしました');
-      } catch (error) {
-        // メール確認エラーの場合は特別なメッセージを表示
-        if (error instanceof Error &&
-          error.message.includes('メールアドレスの確認が完了していません')) {
-          HotToast.error('メールアドレスの確認が必要です。メールの確認リンクをクリックしてください。');
-        } else {
-          HotToast.error(error instanceof Error ? error.message : 'ログインに失敗しました');
-        }
-        // エラーを上位に伝播させる
-        throw error;
-      }
-    },
+    signIn,
 
     /**
      * 新規ユーザー登録（メール確認あり）

@@ -1,4 +1,5 @@
-// features/auth/components/LoginForm.tsx
+// src/features/auth/components/LoginForm.tsx
+
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,7 +15,7 @@ interface LoginFormProps {
  */
 export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
     const navigate = useNavigate();
-    const { signIn } = useAuth();
+    const { signIn, isAuthenticated } = useAuth();
 
     // フォーム状態
     const [formData, setFormData] = useState({
@@ -27,6 +28,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isEmailConfirmationError, setIsEmailConfirmationError] = useState(false);
+    const [loginSuccess, setLoginSuccess] = useState(false);
 
     // フォームデータが変更されたときにエラーをクリア
     useEffect(() => {
@@ -34,6 +36,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         setError(null);
         setIsEmailConfirmationError(false);
     }, [formData]);
+
+    // 認証状態が変わったらリダイレクト
+    useEffect(() => {
+        if (isAuthenticated && loginSuccess) {
+            navigate('/', { replace: true });
+        }
+    }, [isAuthenticated, loginSuccess, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -54,7 +63,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         setLoading(true);
         try {
             await signIn(email, password);
-            navigate('/');
+
+            // ログイン成功をマーク
+            setLoginSuccess(true);
+
+            // ページ内の状態を更新して、ログイン完了のUIを表示する
+            // この部分はリダイレクト前に表示される
+            setFormData({ email: '', password: '' });
+
+            // ユーザーエクスペリエンス向上のために短いディレイを設ける
+            // これによりログイン成功のフィードバックが表示される時間を確保
+            setTimeout(() => {
+                navigate('/', { replace: true });
+            }, 300);
         } catch (err) {
             console.error('Login error:', err);
             const errorMessage = err instanceof Error ? err.message : '予期せぬエラーが発生しました';
@@ -69,6 +90,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
             setLoading(false);
         }
     };
+
+    // ログイン成功後の表示
+    if (loginSuccess) {
+        return (
+            <div className="bg-green-50 p-6 rounded-lg text-center animate-fadeIn">
+                <div className="w-16 h-16 bg-green-100 rounded-full mx-auto flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 className="text-lg font-medium text-green-800">ログインに成功しました</h3>
+                <p className="text-green-700 mt-2">トップページにリダイレクトしています...</p>
+            </div>
+        );
+    }
 
     return (
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -195,7 +231,31 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
                         disabled={loading}
                         className="group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
-                        {loading ? "処理中..." : "ログイン"}
+                        {loading ? (
+                            <>
+                                <svg
+                                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                </svg>
+                                処理中...
+                            </>
+                        ) : "ログイン"}
                     </button>
                 </div>
 

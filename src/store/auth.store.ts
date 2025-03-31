@@ -1,4 +1,4 @@
-// store/auth.store.ts
+// src/store/auth.store.ts の改善部分
 
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
@@ -14,12 +14,13 @@ interface AuthStore extends AuthState {
     signUp: (data: SignUpData) => Promise<void>;
     signOut: () => Promise<void>;
     updatePassword: (password: string) => Promise<void>;
+    forceRefresh: () => Promise<void>; // 新しいメソッド: 強制的にユーザー情報を再取得
 }
 
 /**
  * 認証状態を管理するZustandストア
  */
-export const useAuthStore = create<AuthStore>((set) => ({
+export const useAuthStore = create<AuthStore>((set, get) => ({
     user: null,
     loading: true,
     error: null,
@@ -71,48 +72,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
                 // すべての条件をクリアしたらユーザーを設定
                 set({ user: userData as User, loading: false });
+                console.log("User state initialized successfully:", userData);
             } else {
                 set({ user: null, loading: false });
             }
-
-            // 認証状態の変更を監視
-            supabase.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                    if (session) {
-                        try {
-                            // データベースからユーザー情報を取得
-                            const { data: userData, error: userError } = await supabase
-                                .from('users')
-                                .select('*')
-                                .eq('id', session.user.id)
-                                .eq('is_withdrawn', false)
-                                .single();
-
-                            if (userError) throw userError;
-
-                            // メール確認状態をチェック
-                            if (!userData || !userData.email_confirmed) {
-                                // メール未確認の場合はログアウト
-                                await supabase.auth.signOut();
-                                set({
-                                    user: null,
-                                    error: 'メールアドレスの確認が完了していません。メールの確認リンクをクリックしてください。'
-                                });
-                                return;
-                            }
-
-                            set({ user: userData as User });
-                        } catch (error) {
-                            console.error('User data fetch error:', error);
-                            await supabase.auth.signOut();
-                            set({ user: null });
-                        }
-                    }
-                } else if (event === 'SIGNED_OUT') {
-                    set({ user: null });
-                }
-            });
-
         } catch (error) {
             console.error('Auth initialization error:', error);
             set({
@@ -124,6 +87,39 @@ export const useAuthStore = create<AuthStore>((set) => ({
     },
 
     /**
+     * 強制的にユーザー情報を再取得する
+     * ログイン状態のUIが更新されない場合に使用
+     */
+    forceRefresh: async () => {
+        // 現在のセッション状態を取得
+        const { data: sessionData } = await supabase.auth.getSession();
+
+        if (sessionData.session?.user?.id) {
+            try {
+                // ユーザー情報を再取得
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', sessionData.session.user.id)
+                    .eq('is_withdrawn', false)
+                    .single();
+
+                if (userError) throw userError;
+
+                // ユーザー情報を更新
+                set({ user: userData as User });
+                console.log("User state forcefully refreshed:", userData);
+                return;
+            } catch (error) {
+                console.error("Error refreshing user data:", error);
+            }
+        }
+
+        // セッションがなければユーザーをnullに設定
+        set({ user: null });
+    },
+
+    /**
      * ログイン処理
      * @param credentials ログイン情報
      */
@@ -132,7 +128,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
         try {
             // メール確認済みチェック付きのログイン処理
             const user = await AuthService.signInWithEmailConfirmation(credentials);
+
+            // ユーザー情報を更新
             set({ user, loading: false });
+
+            // ログイン後に強制的に情報を再取得（Supabaseの非同期性に対応）
+            setTimeout(async () => {
+                try {
+                    const { forceRefresh } = get();
+                    await forceRefresh();
+                } catch (err) {
+                    console.error("Error during post-login refresh:", err);
+                }
+            }, 100);
         } catch (error) {
             console.error('Sign in error:', error);
             set({
