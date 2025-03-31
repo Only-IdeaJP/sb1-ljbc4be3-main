@@ -18,7 +18,7 @@ const EMAIL_ACTIONS = {
 
 // 環境によるリダイレクトURL設定
 function getRedirectUrl(action: string, providedRedirect?: string): string {
-  const baseUrl = 'https://sb1-ljbc4be3-main-pacgcfbfh-onlyideas-projects.vercel.app'; // デフォルトのアプリURL
+  const baseUrl = 'https://sb1-ljbc4be3-main.vercel.app'; // デフォルトのアプリURL
 
   // 提供されたリダイレクトURLがあれば、それを優先
   if (providedRedirect) {
