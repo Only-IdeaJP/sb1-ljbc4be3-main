@@ -2,107 +2,132 @@
 
 import { CheckCircle } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
-import { supabase } from "../lib/supabase";
+import { serverSupabase } from "../lib/server-supabase";
+import { extractAuthTokens } from "../utils/token-extractor";
 
 /**
  * メール確認成功ページ
  * ユーザーがメール内の確認リンクをクリックした後に表示されるページ
  */
 export const EmailConfirmSuccess: React.FC = () => {
-    const location = useLocation();
     const [updating, setUpdating] = useState(false);
     const [updated, setUpdated] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const toastShownRef = useRef(false);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
     const processedRef = useRef(false);
 
-    // メール確認ステータスを更新
+    // 1回だけ処理を実行するための副作用
     useEffect(() => {
-        // 既に処理済みの場合はスキップ
-        if (processedRef.current) return;
+        // すでに処理済みの場合は何もしない
+        if (processedRef.current || updated) return;
+        processedRef.current = true;
 
         const updateEmailConfirmation = async () => {
             try {
                 setUpdating(true);
-                processedRef.current = true;
+                console.log("Email confirmation process started");
 
-                // URLフラグメントからトークンを抽出
-                const fragment = location.hash.substring(1);
-                const params = new URLSearchParams(fragment || location.search);
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
+                // URLからトークン情報を抽出
+                const { accessToken, userId, email } = extractAuthTokens();
+                console.log(`Extracted token info: userId=${userId}, email=${email}`);
 
-                // 現在のセッションをチェック
-                const { data, error: sessionError } = await supabase.auth.getSession();
-
-                if (sessionError) {
-                    console.error("Session error:", sessionError);
-                    setError("セッションの取得に失敗しました");
-                    return;
-                }
-
-                // ユーザーIDを確認
-                let userId = data.session?.user?.id;
-
-                // セッションがない場合はトークンを使用してセッションを設定
-                if (!userId && accessToken) {
-                    // トークンがある場合、セッションを設定
-                    try {
-                        const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
-                            access_token: accessToken,
-                            refresh_token: refreshToken || '',
-                        });
-
-                        if (setSessionError) {
-                            throw setSessionError;
-                        }
-
-                        userId = sessionData.session?.user?.id;
-                    } catch (error) {
-                        console.error("Error setting session:", error);
-                    }
-                }
-
+                // ユーザーIDが取得できた場合
                 if (userId) {
-                    // ユーザーのメール確認ステータスを更新
-                    const { error: updateError } = await supabase
+                    // サーバーサイドのSupabaseクライアントでデータベースを直接更新
+                    const { error: updateError } = await serverSupabase
                         .from('users')
                         .update({ email_confirmed: true })
                         .eq('id', userId);
 
                     if (updateError) {
-                        console.error("Error updating user:", updateError);
-                        setError("ユーザー情報の更新に失敗しました");
-                        return;
+                        console.error("Database update error:", updateError);
+                        throw new Error("メール確認ステータスの更新に失敗しました");
                     }
 
+                    console.log(`Successfully updated email confirmation for user ${userId}`);
+                    setUserEmail(email);
                     setUpdated(true);
+                    HotToast.success('メールアドレスの確認が完了しました！');
+                    return;
+                }
 
-                    // トースト通知を表示
-                    if (!toastShownRef.current) {
-                        HotToast.success('メールアドレスの確認が完了しました！');
-                        toastShownRef.current = true;
-                        localStorage.setItem('email_confirmation_toast_shown', 'true');
+                // アクセストークンはないがメールアドレスがある場合
+                if (email) {
+                    const { data: userData, error: userError } = await serverSupabase
+                        .from('users')
+                        .select('id')
+                        .eq('email', email)
+                        .single();
+
+                    if (userError || !userData) {
+                        console.error("User lookup error:", userError);
+                        throw new Error("ユーザー情報が見つかりませんでした");
                     }
 
-                    // 成功！ここで明示的にサインアウトしないようにする
-                    // 注意: 以前はこの後にサインアウト処理があったが、これを削除
-                } else {
-                    setError("認証情報が見つかりません。リンクをもう一度クリックするか、ログインしてください。");
+                    const { error: updateError } = await serverSupabase
+                        .from('users')
+                        .update({ email_confirmed: true })
+                        .eq('id', userData.id);
+
+                    if (updateError) {
+                        console.error("Database update error:", updateError);
+                        throw new Error("メール確認ステータスの更新に失敗しました");
+                    }
+
+                    console.log(`Successfully updated email confirmation for email ${email}`);
+                    setUserEmail(email);
+                    setUpdated(true);
+                    HotToast.success('メールアドレスの確認が完了しました！');
+                    return;
                 }
+
+                // 保存されているメールアドレスを確認
+                const pendingEmail = localStorage.getItem('pending_email');
+                if (pendingEmail) {
+                    const { data: userData, error: userError } = await serverSupabase
+                        .from('users')
+                        .select('id')
+                        .eq('email', pendingEmail)
+                        .single();
+
+                    if (userError || !userData) {
+                        console.error("User lookup error:", userError);
+                        throw new Error("ユーザー情報が見つかりませんでした");
+                    }
+
+                    const { error: updateError } = await serverSupabase
+                        .from('users')
+                        .update({ email_confirmed: true })
+                        .eq('id', userData.id);
+
+                    if (updateError) {
+                        console.error("Database update error:", updateError);
+                        throw new Error("メール確認ステータスの更新に失敗しました");
+                    }
+
+                    console.log(`Successfully updated email confirmation for pending email ${pendingEmail}`);
+                    setUserEmail(pendingEmail);
+                    localStorage.removeItem('pending_email');
+                    setUpdated(true);
+                    HotToast.success('メールアドレスの確認が完了しました！');
+                    return;
+                }
+
+                // ユーザー識別情報が見つからない場合
+                throw new Error("認証情報が見つかりません。リンクをもう一度クリックするか、ログインしてください。");
+
             } catch (error) {
-                console.error('メール確認ステータスの更新エラー:', error);
-                setError('メール確認ステータスの更新に失敗しました');
+                console.error("Email confirmation error:", error);
+                setError(error instanceof Error ? error.message : "メール確認中にエラーが発生しました");
             } finally {
                 setUpdating(false);
             }
         };
 
-        // 処理を実行
         updateEmailConfirmation();
-    }, [location]);
+    }, [updated]);
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-12">
@@ -129,7 +154,9 @@ export const EmailConfirmSuccess: React.FC = () => {
                 ) : (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                         <p className="text-green-800">
-                            {updating ? "確認処理中..." : "確認が完了しました。ログインして利用を開始してください。"}
+                            {updating ? "確認処理中..." :
+                                updated ? `${userEmail ? userEmail + 'の' : ''}メール確認が完了しました。` :
+                                    "メール確認処理中..."}
                         </p>
                     </div>
                 )}
