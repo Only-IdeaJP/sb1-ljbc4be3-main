@@ -1,4 +1,5 @@
 // src/pages/PasswordReset.tsx
+
 import { CheckCircle, Eye, EyeOff, Lock } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -99,7 +100,7 @@ const PasswordReset: React.FC = () => {
         setLoading(true);
 
         try {
-            // トークンでの認証が確認できていれば、パスワードを更新
+            // パスワードを更新
             const { error: updateError } = await supabase.auth.updateUser({
                 password: password
             });
@@ -113,17 +114,10 @@ const PasswordReset: React.FC = () => {
             setSuccess(true);
             HotToast.success("パスワードを更新しました");
 
-            // 3秒後にログアウトしてログイン画面へリダイレクト
-            setTimeout(async () => {
-                try {
-                    // 明示的にログアウト
-                    await supabase.auth.signOut();
-                    console.log("Successfully signed out after password reset");
-                } catch (err) {
-                    console.error("Error signing out:", err);
-                } finally {
-                    navigate("/login?password_reset=success");
-                }
+            // 3秒後にログイン画面へリダイレクト - ログアウトしない
+            setTimeout(() => {
+                // パラメータを変更してリダイレクト（ユーザーにトーストメッセージが重複して表示されないように）
+                navigate("/", { replace: true });
             }, 3000);
         } catch (err: any) {
             console.error("Password reset error:", err);
@@ -199,7 +193,7 @@ const PasswordReset: React.FC = () => {
                         <p className="text-gray-600 mt-2">
                             新しいパスワードでログインできるようになりました。
                             <br />
-                            自動的にログイン画面へリダイレクトします...
+                            トップページへリダイレクトします...
                         </p>
                     </div>
 
@@ -207,7 +201,7 @@ const PasswordReset: React.FC = () => {
                         <p className="text-green-700">
                             パスワードの更新が完了しました。
                             <br />
-                            ログイン画面へ移動中...
+                            トップページへ移動中...
                         </p>
                     </div>
                 </div>
