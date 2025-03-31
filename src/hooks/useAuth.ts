@@ -1,7 +1,16 @@
-// hooks/useAuth.ts
+// src/hooks/useAuth.ts
 
+import { useCallback } from 'react';
 import { HotToast } from '../components/Toaster';
-import { signInWithEmailConfirmation, signUpWithEmailConfirmation } from '../services/auth.service';
+import {
+  signOut as authSignOut,
+  updatePassword as authUpdatePassword,
+  checkEmailConfirmation,
+  setUserSession,
+  signInWithEmailConfirmation,
+  signUpWithEmailConfirmation,
+  updateEmailConfirmation
+} from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
 
 /**
@@ -16,11 +25,62 @@ export const useAuth = () => {
     updatePassword: storeUpdatePassword
   } = useAuthStore();
 
+  /**
+   * メール確認状態を更新する
+   * @param userId ユーザーID
+   */
+  const confirmEmail = useCallback(async (userId: string): Promise<boolean> => {
+    try {
+      await updateEmailConfirmation(userId);
+      return true;
+    } catch (error) {
+      console.error('Error confirming email:', error);
+      return false;
+    }
+  }, []);
+
+  /**
+   * URLのトークンからセッションを復元する
+   * @param accessToken アクセストークン
+   * @param refreshToken リフレッシュトークン
+   */
+  const restoreSession = useCallback(async (
+    accessToken: string,
+    refreshToken?: string
+  ): Promise<boolean> => {
+    try {
+      const success = await setUserSession(accessToken, refreshToken);
+      if (success) {
+        HotToast.success('セッションが復元されました');
+      }
+      return success;
+    } catch (error) {
+      console.error('Error restoring session:', error);
+      return false;
+    }
+  }, []);
+
+  /**
+   * メール確認状態を確認
+   * @param userId ユーザーID
+   */
+  const checkEmailConfirmed = useCallback(async (userId: string): Promise<boolean> => {
+    try {
+      return await checkEmailConfirmation(userId);
+    } catch (error) {
+      console.error('Error checking email confirmation:', error);
+      return false;
+    }
+  }, []);
+
   return {
     user,
     loading,
     error,
     isAuthenticated: !!user,
+    confirmEmail,
+    restoreSession,
+    checkEmailConfirmed,
 
     /**
      * ログイン処理
@@ -80,6 +140,7 @@ export const useAuth = () => {
      */
     signOut: async (): Promise<void> => {
       try {
+        await authSignOut();
         await storeSignOut();
         HotToast.success('ログアウトしました');
       } catch (error) {
@@ -95,6 +156,7 @@ export const useAuth = () => {
      */
     updatePassword: async (password: string): Promise<void> => {
       try {
+        await authUpdatePassword(password);
         await storeUpdatePassword(password);
         HotToast.success('パスワードを更新しました');
       } catch (error) {
