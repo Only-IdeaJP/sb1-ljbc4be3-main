@@ -24,6 +24,7 @@ const ERROR_MESSAGES: ErrorMapping = {
     'User not found': 'ユーザーが見つかりません',
     'No user found with that email': 'そのメールアドレスのユーザーが見つかりません',
     'Cannot sign up with provided authorization code': '提供された認証コードでサインアップできません',
+    'New password should be different from the old password': '新しいパスワードは古いパスワードと異なるものにしてください',
 
     // RLS（Row Level Security）関連のエラー
     'new row violates row-level security policy': '行レベルセキュリティポリシーに違反しています',
