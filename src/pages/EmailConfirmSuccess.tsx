@@ -30,7 +30,7 @@ export const EmailConfirmSuccess: React.FC = () => {
                 console.log("Email confirmation process started");
 
                 // URLからトークン情報を抽出
-                const { accessToken, userId, email } = extractAuthTokens();
+                const { userId, email } = extractAuthTokens();
                 console.log(`Extracted token info: userId=${userId}, email=${email}`);
 
                 // ユーザーIDが取得できた場合

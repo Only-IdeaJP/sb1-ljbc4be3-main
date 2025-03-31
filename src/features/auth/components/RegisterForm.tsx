@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChildBirthSelector } from '../../../components/form/ChildBirthSelector';
 import { useAuth } from '../../../hooks/useAuth';
 import { AuthService } from '../../../services/auth.service';
+import { handleSupabaseError } from '../../../utils/errorHandler'; // エラーハンドラをインポート
 
 interface RegisterFormProps {
     onToggleForm: () => void;
@@ -111,7 +112,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleForm }) => {
             navigate('/email-confirmation');
         } catch (err) {
             console.error('Registration error:', err);
-            setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
+
+            // エラーメッセージを日本語に変換
+            const errorMessage = handleSupabaseError(err);
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

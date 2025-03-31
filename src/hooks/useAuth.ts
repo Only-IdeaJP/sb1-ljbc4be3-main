@@ -13,7 +13,7 @@ import {
   updateEmailConfirmation
 } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
-
+import { handleSupabaseError } from '../utils/errorHandler';
 /**
  * 認証機能を提供するカスタムフック
  */
@@ -124,12 +124,15 @@ export const useAuth = () => {
         });
       }, 100);
     } catch (error) {
+      // エラーメッセージを日本語に変換
+      const errorMessage = handleSupabaseError(error);
+
       // メール確認エラーの場合は特別なメッセージを表示
-      if (error instanceof Error &&
-        error.message.includes('メールアドレスの確認が完了していません')) {
+      if (errorMessage.includes('メールアドレスが確認されていません') ||
+        errorMessage.includes('メールアドレスの確認が完了していません')) {
         HotToast.error('メールアドレスの確認が必要です。メールの確認リンクをクリックしてください。');
       } else {
-        HotToast.error(error instanceof Error ? error.message : 'ログインに失敗しました');
+        HotToast.error(errorMessage);
       }
       // エラーを上位に伝播させる
       throw error;
@@ -169,7 +172,9 @@ export const useAuth = () => {
         await signUpWithEmailConfirmation({ email, password, userData });
         HotToast.success('確認メールを送信しました。メールのリンクをクリックしてアカウント登録を完了してください。');
       } catch (error) {
-        HotToast.error(error instanceof Error ? error.message : 'アカウント登録に失敗しました');
+        // エラーメッセージを日本語に変換
+        const errorMessage = handleSupabaseError(error);
+        HotToast.error(errorMessage);
         // エラーを上位に伝播させる
         throw error;
       }
@@ -184,7 +189,10 @@ export const useAuth = () => {
         await storeSignOut();
         HotToast.success('ログアウトしました');
       } catch (error) {
-        HotToast.error(error instanceof Error ? error.message : 'ログアウトに失敗しました',);
+        // エラーメッセージを日本語に変換
+        const errorMessage = handleSupabaseError(error);
+        HotToast.error(errorMessage);
+        // エラーを上位に伝播させる
         // エラーを上位に伝播させる
         throw error;
       }
@@ -200,7 +208,9 @@ export const useAuth = () => {
         await storeUpdatePassword(password);
         HotToast.success('パスワードを更新しました');
       } catch (error) {
-        HotToast.error(error instanceof Error ? error.message : 'パスワード更新に失敗しました',);
+        // エラーメッセージを日本語に変換
+        const errorMessage = handleSupabaseError(error);
+        HotToast.error(errorMessage);
         // エラーを上位に伝播させる
         throw error;
       }
