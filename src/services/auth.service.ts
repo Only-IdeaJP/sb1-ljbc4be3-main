@@ -92,7 +92,7 @@ export const signInWithEmailConfirmation = async ({ email, password }: SignInCre
 export const signUpWithEmailConfirmation = async ({ email, password, userData }: SignUpData): Promise<void> => {
     try {
         // リダイレクトURLを設定（メール認証後にリダイレクトされるURL）
-        const redirectTo = `https://sb1-ljbc4be3-main.vercel.app/confirm-success`;
+        const redirectTo = `${window.location.origin}/confirm-success`;
 
         // Supabaseの認証にメール確認オプションを指定して新規ユーザーを作成
         const { data: authData, error } = await supabase.auth.signUp({
@@ -174,7 +174,7 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
  */
 export const checkEmailConfirmation = async (userId: string): Promise<boolean> => {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await serverSupabase  // サーバーサイド権限で確認
             .from('users')
             .select('email_confirmed')
             .eq('id', userId)
@@ -201,6 +201,8 @@ export const updateEmailConfirmation = async (userId: string): Promise<void> => 
             .eq('id', userId);
 
         if (error) throw error;
+
+        console.log(`User ${userId} email confirmation status updated to true`);
     } catch (error) {
         console.error('Email confirmation update error:', error);
         throw error instanceof Error ? error : new Error('メール確認状態の更新に失敗しました');
@@ -243,6 +245,42 @@ export const updatePassword = async (password: string): Promise<void> => {
 };
 
 /**
+ * 現在のユーザー情報を取得する
+ * @returns ユーザー情報またはnull
+ */
+export const getCurrentUser = async (): Promise<User | null> => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.access_token) return null;
+
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(session.access_token);
+
+        if (userError || !authUser) {
+            console.error('User fetch error:', userError);
+            return null;
+        }
+
+        const { data: userData, error: userDataError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .eq('is_withdrawn', false)
+            .single();
+
+        if (userDataError || !userData) {
+            console.error('User data fetch error:', userDataError);
+            return null;
+        }
+
+        return userData as User;
+    } catch (error) {
+        console.error('Get current user error:', error);
+        return null;
+    }
+};
+
+/**
  * メールアドレスとパスワードをバリデーションする
  * @param email メールアドレス
  * @param password パスワード
@@ -270,40 +308,50 @@ export const validateCredentials = (email: string, password: string): string[] =
     return errors;
 };
 
+/**
+ * セッションの存在をチェックする
+ * このメソッドは認証状態の確認のみを行い、詳細なユーザー情報は取得しない
+ * @returns 認証済みかどうか
+ */
+export const hasActiveSession = async (): Promise<boolean> => {
+    try {
+        const { data } = await supabase.auth.getSession();
+        return !!data.session;
+    } catch (error) {
+        console.error('Session check error:', error);
+        return false;
+    }
+};
+
+/**
+ * ユーザーのセッションを設定する
+ * 主にURLのトークンから認証状態を復元するために使用
+ * @param accessToken アクセストークン
+ * @param refreshToken リフレッシュトークン
+ * @returns 設定に成功したかどうか
+ */
+export const setUserSession = async (accessToken: string, refreshToken?: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+        });
+
+        if (error) {
+            console.error('Error setting user session:', error);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Error setting user session:', error);
+        return false;
+    }
+};
+
 // このオブジェクトはレガシーコードのサポート用に残します
 // 将来的には個別の関数にアクセスするように変更することをお勧めします
 export const AuthService: IAuthService = {
-    getCurrentUser: async () => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-
-            if (!session?.access_token) return null;
-
-            const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(session.access_token);
-
-            if (userError || !authUser) {
-                console.error('User fetch error:', userError);
-                return null;
-            }
-
-            const { data: userData, error: userDataError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', authUser.id)
-                .eq('is_withdrawn', false)
-                .single();
-
-            if (userDataError || !userData) {
-                console.error('User data fetch error:', userDataError);
-                return null;
-            }
-
-            return userData as User;
-        } catch (error) {
-            console.error('Get current user error:', error);
-            return null;
-        }
-    },
+    getCurrentUser,
     signIn: async (credentials) => {
         // まず既存のセッションをクリア
         await supabase.auth.signOut();

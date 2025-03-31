@@ -1,10 +1,9 @@
-// src/pages/EmailConfirmSuccess.tsx
+// src/pages/EmailConfirmSuccess.tsx の修正
 
 import { CheckCircle } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
-import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -12,14 +11,14 @@ import { supabase } from "../lib/supabase";
  * ユーザーがメール内の確認リンクをクリックした後に表示されるページ
  */
 export const EmailConfirmSuccess: React.FC = () => {
-    const navigate = useNavigate();
+
     const location = useLocation();
-    const { user } = useAuth();
+
     const [updating, setUpdating] = useState(false);
     const [updated, setUpdated] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
     const toastShownRef = useRef(false);
+    const [processingComplete, setProcessingComplete] = useState(false);
 
     // デバッグ - URLの全コンポーネントをログに記録
     useEffect(() => {
@@ -33,11 +32,9 @@ export const EmailConfirmSuccess: React.FC = () => {
     useEffect(() => {
         const updateEmailConfirmation = async () => {
             // すでに更新済みの場合は処理しない
-            if (updated) return;
+            if (updated || processingComplete) return;
 
             const toastShown = localStorage.getItem('email_confirmation_toast_shown');
-
-            if (updated || toastShown === 'true') return;
 
             try {
                 setUpdating(true);
@@ -48,6 +45,7 @@ export const EmailConfirmSuccess: React.FC = () => {
                 if (sessionError) {
                     console.error("Session error:", sessionError);
                     setError("セッションの取得に失敗しました");
+                    setProcessingComplete(true);
                     return;
                 }
 
@@ -67,50 +65,96 @@ export const EmailConfirmSuccess: React.FC = () => {
                     if (updateError) {
                         console.error("Error updating user:", updateError);
                         setError("ユーザー情報の更新に失敗しました");
+                        setProcessingComplete(true);
                         return;
                     }
 
                     setUpdated(true);
-                    // Only show the toast if it hasn't been shown yet
-                    if (!toastShownRef.current) {
+
+                    // トーストメッセージを表示（まだ表示されていなければ）
+                    if (!toastShownRef.current && toastShown !== 'true') {
                         HotToast.success('メールアドレスの確認が完了しました！');
                         toastShownRef.current = true;
-                    }
-                    if (toastShown !== 'true') {
-                        HotToast.success('メールアドレスの確認が完了しました！');
                         localStorage.setItem('email_confirmation_toast_shown', 'true');
 
-                        // Clear this flag after a while (e.g., 10 minutes)
+                        // フラグをしばらくしたら削除（10分後）
                         setTimeout(() => {
                             localStorage.removeItem('email_confirmation_toast_shown');
                         }, 10 * 60 * 1000);
                     }
 
+                    // 成功した場合は、この状態を維持するためにセッションを継続
+                    // この段階でログアウトしないことが重要
+                    setProcessingComplete(true);
                 } else {
-                    // セッションがない場合、直接アクセスしたか、確認リンクが機能していない
-                    console.log("No active session found");
+                    // セッションがない場合、URLからトークン情報を取得
+                    // "#"以降のフラグメント部分から取得を試みる（Supabaseリダイレクトの特性）
+                    const fragment = location.hash.substring(1);
+                    const params = new URLSearchParams(fragment || location.search);
 
-                    // URLからトークンを取得しようとする（フォールバック）
-                    const params = new URLSearchParams(location.search);
                     const accessToken = params.get('access_token');
+                    const refreshToken = params.get('refresh_token');
+                    const type = params.get('type');
 
-                    if (!accessToken && !location.hash.includes('access_token')) {
+                    console.log("URL fragment params:", { accessToken, refreshToken, type });
+
+                    if (accessToken && type === 'signup') {
+                        // トークンが見つかった場合、セッションを設定
+                        try {
+                            const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
+                                access_token: accessToken,
+                                refresh_token: refreshToken || '',
+                            });
+
+                            if (setSessionError) {
+                                throw setSessionError;
+                            }
+
+                            if (sessionData?.session?.user) {
+                                // 成功 - セッションが設定できた場合、ユーザー情報を更新
+                                const userId = sessionData.session.user.id;
+                                console.log("Successfully set session with user:", userId);
+
+                                const { error: updateError } = await supabase
+                                    .from('users')
+                                    .update({ email_confirmed: true })
+                                    .eq('id', userId);
+
+                                if (updateError) {
+                                    throw updateError;
+                                }
+
+                                setUpdated(true);
+                                if (!toastShownRef.current) {
+                                    HotToast.success('メールアドレスの確認が完了しました！');
+                                    toastShownRef.current = true;
+                                    localStorage.setItem('email_confirmation_toast_shown', 'true');
+                                }
+                                setProcessingComplete(true);
+                            }
+                        } catch (error) {
+                            console.error("Error setting session from token:", error);
+                            setError("セッションの設定に失敗しました。ログインしてください。");
+                            setProcessingComplete(true);
+                        }
+                    } else {
+                        // トークンが見つからない場合
+                        console.log("No active session found and no valid tokens in URL");
                         setError("認証トークンが見つかりません。リンクをもう一度クリックするか、ログインしてください。");
-                        return;
+                        setProcessingComplete(true);
                     }
-
-                    setError("セッションが存在しません。ログインしてください。");
                 }
             } catch (error) {
                 console.error('メール確認ステータスの更新エラー:', error);
                 setError('メール確認ステータスの更新に失敗しました');
+                setProcessingComplete(true);
             } finally {
                 setUpdating(false);
             }
         };
 
         updateEmailConfirmation();
-    }, [updated, location]);
+    }, [updated, location, processingComplete]);
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-12">
@@ -137,7 +181,7 @@ export const EmailConfirmSuccess: React.FC = () => {
                 ) : (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                         <p className="text-green-800">
-                            確認が完了しましたので、ログインして利用を開始してください。
+                            {updating ? "確認処理中..." : "確認が完了しました。ログインして利用を開始してください。"}
                         </p>
                     </div>
                 )}
