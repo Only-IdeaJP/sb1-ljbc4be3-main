@@ -25,6 +25,10 @@ export type TagName =
     | "論理"
     | "理科的常識"
     | "社会的常識"
+    | "国語"  // 新しいタグ
+    | "算数"  // 新しいタグ
+    | "理科"  // 新しいタグ
+    | "社会"  // 新しいタグ
     | "その他"
     | "default";
 
@@ -98,12 +102,38 @@ export const TAG_COLORS: Record<TagName, TagStyle> = {
         hoverBg: "hover:bg-cyan-200",
         border: "border-cyan-200"
     },
+    // 新しい科目タグを追加
+    "国語": {
+        bg: "bg-rose-100",
+        text: "text-rose-800",
+        hoverBg: "hover:bg-rose-200",
+        border: "border-rose-200"
+    },
+    "算数": {
+        bg: "bg-sky-100",
+        text: "text-sky-800",
+        hoverBg: "hover:bg-sky-200",
+        border: "border-sky-200"
+    },
+    "理科": {
+        bg: "bg-emerald-100",
+        text: "text-emerald-800",
+        hoverBg: "hover:bg-emerald-200",
+        border: "border-emerald-200"
+    },
+    "社会": {
+        bg: "bg-amber-100",
+        text: "text-amber-800",
+        hoverBg: "hover:bg-amber-200",
+        border: "border-amber-200"
+    },
     "その他": {
         bg: "bg-gray-100",
         text: "text-gray-800",
         hoverBg: "hover:bg-gray-200",
         border: "border-gray-200"
     },
+
     // デフォルトカラー
     "default": {
         bg: "bg-gray-100",
@@ -125,6 +155,10 @@ export const DEFAULT_TAGS = [
     "論理",
     "理科的常識",
     "社会的常識",
+    "国語",  // 新しいタグ
+    "算数",  // 新しいタグ
+    "理科",  // 新しいタグ
+    "社会",  // 新しいタグ
     "その他",
 ];
 
@@ -139,6 +173,10 @@ export const TAG_STYLES: Record<string, string> = {
     論理: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200",
     理科的常識: "bg-cyan-100 text-cyan-800 hover:bg-cyan-200",
     社会的常識: "bg-orange-100 text-orange-800 hover:bg-orange-200",
+    国語: "bg-rose-100 text-rose-800 hover:bg-rose-200",
+    算数: "bg-sky-100 text-sky-800 hover:bg-sky-200",
+    理科: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200",
+    社会: "bg-amber-100 text-amber-800 hover:bg-amber-200",
     その他: "bg-teal-100 text-teal-800 hover:bg-teal-200",
 };
 
