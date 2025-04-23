@@ -1,0 +1,133 @@
+Tables
+
+events
+CREATE TABLE public.events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  type text NOT NULL,
+  data jsonb NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT events_pkey PRIMARY KEY (id),
+  CONSTRAINT events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+paper_grades
+CREATE TABLE public.paper_grades (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  paper_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  is_correct boolean NOT NULL,
+  graded_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT paper_grades_pkey PRIMARY KEY (id),
+  CONSTRAINT paper_grades_paper_id_fkey FOREIGN KEY (paper_id) REFERENCES papers(id) ON DELETE CASCADE,
+  CONSTRAINT paper_grades_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS paper_grades_paper_id_idx ON public.paper_grades USING btree (paper_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS paper_grades_user_id_idx ON public.paper_grades USING btree (user_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS paper_grades_graded_at_idx ON public.paper_grades USING btree (graded_at) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS paper_grades_user_paper_idx ON public.paper_grades USING btree (user_id, paper_id) TABLESPACE pg_default;
+
+paper_makeaccount
+CREATE TABLE public.paper_makeaccount (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  email text NOT NULL,
+  account_type text NOT NULL,
+  status text NOT NULL DEFAULT 'active'::text,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT paper_makeaccount_pkey PRIMARY KEY (id),
+  CONSTRAINT paper_makeaccount_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+papers
+CREATE TABLE public.papers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  file_path text NOT NULL,
+  tags text[] NULL DEFAULT '{}'::text[],
+  is_correct boolean NOT NULL DEFAULT false,
+  last_practiced timestamp with time zone NULL,
+  next_practice_date timestamp with time zone NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT papers_pkey PRIMARY KEY (id),
+  CONSTRAINT papers_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+users
+CREATE TABLE public.users (
+  id uuid NOT NULL,
+  email text NOT NULL,
+  full_name text NULL,
+  nickname text NULL,
+  address text NULL,
+  phone text NULL,
+  subscription_tier text NULL DEFAULT 'free'::text,
+  subscription_status text NULL DEFAULT 'active'::text,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  is_withdrawn boolean NULL DEFAULT false,
+  withdrawn_at timestamp with time zone NULL,
+  child_birth_year character varying NULL,
+  child_birth_month character varying NULL,
+  email_confirmed boolean NULL DEFAULT false,
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  CONSTRAINT child_birth_month_check CHECK ((((child_birth_month)::text ~ '^\\d{1,2}$'::text) AND (((child_birth_month)::integer >= 1) AND ((child_birth_month)::integer <= 12)))),
+  CONSTRAINT child_birth_year_check CHECK ((((child_birth_year)::text ~ '^\\d{4}$'::text) AND ((child_birth_year)::integer >= 1900) AND (((child_birth_year)::integer)::numeric <= EXTRACT(year FROM CURRENT_DATE))))
+) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_users_email_confirmed ON public.users USING btree (email_confirmed) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS users_email_idx ON public.users USING btree (email) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS users_created_at_idx ON public.users USING btree (created_at) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS users_is_withdrawn_idx ON public.users USING btree (is_withdrawn) TABLESPACE pg_default;
+
+Functions
+
+check_paper_grade_user
+CREATE OR REPLACE FUNCTION public.check_paper_grade_user()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Cannot create or update grades for other users';
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM papers
+    WHERE id = NEW.paper_id
+    AND user_id = NEW.user_id
+  ) THEN
+    RAISE EXCEPTION 'User does not own this paper';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+handle_new_user
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.users (
+    id,
+    email,
+    child_birth_year,
+    child_birth_month,
+    is_withdrawn,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'child_birth_year',
+    new.raw_user_meta_data->>'child_birth_month',
+    false,
+    now(),
+    now()
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql;
