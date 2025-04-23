@@ -207,14 +207,15 @@ export const PracticePapers: React.FC = () => {
           )}
         </div>
       </div>
-
-      <PaperGrid
-        papers={generatedPapers}
-        selectedPapers={selectedPapers}
-        toggleSelection={toggleSelection}
-        loading={loading}
-        emptyMessage="問題が見つかりませんでした。「問題を生成」をクリックして問題を作成してください。"
-      />
+      <div className="no-print">
+        <PaperGrid
+          papers={generatedPapers}
+          selectedPapers={selectedPapers}
+          toggleSelection={toggleSelection}
+          loading={loading}
+          emptyMessage="問題が見つかりませんでした。「問題を生成」をクリックして問題を作成してください。"
+        />
+      </div>
 
       <PracticePrintView papers={generatedPapers} />
     </div>
