@@ -3,10 +3,9 @@ import { NAV_LINKS } from "../../constant/Constant";
 import { useAuth } from "../../hooks/useAuth";
 
 const Header = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   return (
-
     <header className="bg-white shadow-sm">
       <div className="no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -26,22 +25,24 @@ const Header = () => {
                 </h1>
               </div>
 
-              {/* User Info & Authentication */}
-              <div className="flex items-center space-x-6">
-                <p className="text-sm text-gray-600">
-                  今日最適な20枚を自動生成する。親子にハグするゆとりを。
-                </p>
-                <Link
-                  to={user ? "/mypage/profile" : "/login"}
-                  className="text-gray-600 hover:text-indigo-600 flex items-center space-x-2"
-                >
-                  <span>{user ? "マイページ" : "ログイン"}</span>
-                </Link>
-              </div>
+              {/* User Info & Authentication - Only show when not loading */}
+              {!loading && (
+                <div className="flex items-center space-x-6">
+                  <p className="text-sm text-gray-600">
+                    今日最適な20枚を自動生成する。親子にハグするゆとりを。
+                  </p>
+                  <Link
+                    to={user ? "/mypage/profile" : "/login"}
+                    className="text-gray-600 hover:text-indigo-600 flex items-center space-x-2"
+                  >
+                    <span>{user ? "マイページ" : "ログイン"}</span>
+                  </Link>
+                </div>
+              )}
             </div>
 
-            {/* Navigation Menu */}
-            {user && (
+            {/* Navigation Menu - Only show when logged in and not loading */}
+            {!loading && user && (
               <nav className="flex items-center space-x-6">
                 {NAV_LINKS.map(({ to, label }) => (
                   <Link
@@ -55,7 +56,8 @@ const Header = () => {
               </nav>
             )}
           </div>
-        </div>        </div>
+        </div>
+      </div>
     </header>
   );
 };

@@ -89,9 +89,7 @@ const ActivityItem = ({
     icon: Icon,
     color,
     bg,
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-  } = activityMap[type] || activityMap.upload;
+  } = activityMap[type as keyof typeof activityMap] || activityMap.upload;
 
   return (
     <div className="flex items-center space-x-4">
@@ -108,22 +106,41 @@ const ActivityItem = ({
   );
 };
 
-const LoggedInUserContent = ({ stats }: { stats?: Stats }) => {
-  if (!stats) {
+/**
+ * ログイン済みユーザー向けコンテンツ表示コンポーネント
+ * @param stats 統計情報
+ * @param loading データ読み込み中かどうか
+ */
+const LoggedInUserContent = ({
+  stats,
+  loading = false
+}: {
+  stats?: Stats;
+  loading?: boolean;
+}) => {
+  // ロード中の表示
+  if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="text-center">
-          <p className="text-center text-red-500 mb-4">⚠️ データが見つかりません</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          >
-            再読み込み
-          </button>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+          <p className="text-gray-600">データを読み込み中...</p>
         </div>
       </div>
     );
   }
+
+  // 空のstatsオブジェクトを作成（nullまたはundefinedの場合に使用）
+  const defaultStats = {
+    totalPapers: 0,
+    totalStorageKB: 0,
+    reviewDue: 0,
+    weeklyProgress: [],
+    recentActivity: []
+  };
+
+  // statsがない場合はデフォルト値を使用
+  const safeStats = stats || defaultStats;
 
   return (
     <div className="space-y-6">
@@ -135,21 +152,21 @@ const LoggedInUserContent = ({ stats }: { stats?: Stats }) => {
           icon={BookOpen}
           color="text-indigo-600"
           title="総問題数"
-          value={stats.totalPapers || 0}
+          value={safeStats.totalPapers || 0}
           unit="ページ"
         />
         <StatCard
           icon={Database}
           color="text-blue-600"
           title="総データ量"
-          value={stats.totalStorageKB || 0}
+          value={safeStats.totalStorageKB || 0}
           unit="KB"
         />
         <StatCard
           icon={Calendar}
           color="text-red-600"
           title="復習予定"
-          value={stats.reviewDue || 0}
+          value={safeStats.reviewDue || 0}
           unit="ページ"
         />
       </div>
@@ -163,8 +180,8 @@ const LoggedInUserContent = ({ stats }: { stats?: Stats }) => {
             週間進捗
           </h3>
           <div className="h-64 flex items-end space-x-2">
-            {stats.weeklyProgress?.length ? (
-              stats.weeklyProgress.map(({ date, count }) => (
+            {safeStats.weeklyProgress?.length ? (
+              safeStats.weeklyProgress.map(({ date, count }) => (
                 <ProgressBar key={date} date={date} count={count} />
               ))
             ) : (
@@ -182,8 +199,8 @@ const LoggedInUserContent = ({ stats }: { stats?: Stats }) => {
             最近のアクティビティ
           </h3>
           <div className="space-y-4">
-            {stats.recentActivity?.length ? (
-              stats.recentActivity.map(({ id, type, timestamp }) => (
+            {safeStats.recentActivity?.length ? (
+              safeStats.recentActivity.map(({ id, type, timestamp }) => (
                 <ActivityItem key={id} type={type} timestamp={timestamp} />
               ))
             ) : (
