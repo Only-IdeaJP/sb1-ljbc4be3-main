@@ -29,6 +29,7 @@ export type TagName =
     | "算数"  // 新しいタグ
     | "理科"  // 新しいタグ
     | "社会"  // 新しいタグ
+    | "英語"
     | "その他"
     | "default";
 
@@ -59,6 +60,12 @@ export const TAG_COLORS: Record<TagName, TagStyle> = {
         text: "text-green-800",
         hoverBg: "hover:bg-green-200",
         border: "border-green-200"
+    },
+    "英語": {
+        bg: "bg-blue-100",
+        text: "text-blue-800",
+        hoverBg: "hover:bg-blue-200",
+        border: "border-blue-200"
     },
     "図形": {
         bg: "bg-yellow-100",
@@ -158,7 +165,8 @@ export const DEFAULT_TAGS = [
     "国語",  // 新しいタグ
     "算数",  // 新しいタグ
     "理科",  // 新しいタグ
-    "社会",  // 新しいタグ
+    "社会",
+    "英語",  // 新しいタグ
     "その他",
 ];
 
@@ -177,6 +185,7 @@ export const TAG_STYLES: Record<string, string> = {
     算数: "bg-sky-100 text-sky-800 hover:bg-sky-200",
     理科: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200",
     社会: "bg-amber-100 text-amber-800 hover:bg-amber-200",
+    英語: "bg-blue-100 text-blue-800 hover:bg-blue-200",
     その他: "bg-teal-100 text-teal-800 hover:bg-teal-200",
 };
 
