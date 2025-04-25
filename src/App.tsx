@@ -1,6 +1,6 @@
 // src/App.tsx の重要な修正部分
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Navigate,
   Route,
@@ -31,27 +31,57 @@ import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
 import UploadPapers from "./pages/UploadPapers";
 
+
 const App: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const visibilityRef = useRef<string>(document.visibilityState);
+  const [appInitialized, setAppInitialized] = useState(false);
 
-  // ↓↓↓ Supabaseの自動サインアウトを防ぐための重要な修正 ↓↓↓
+  // Combined useEffect to handle both auth events and app initialization
   useEffect(() => {
-    // 認証イベントリスナーの設定
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _) => {
-      console.log(`Auth event: ${event}`);
+    // App initialization logic
+    const initializeApp = async () => {
+      try {
+        console.log("Initializing app and checking session...");
+        const { data } = await supabase.auth.getSession();
+        console.log("Initial session check:", !!data.session);
 
-      // SIGNED_OUTイベントを検知した場合、それが/confirm-successページからの場合は
-      // サインアウトをキャンセルするためにセッションを復元する
+        // Short delay to ensure all async processes complete
+        setTimeout(() => {
+          setAppInitialized(true);
+        }, 500);
+      } catch (err) {
+        console.error("Error during app initialization:", err);
+        setAppInitialized(true); // Still mark as initialized on error
+      }
+    };
+
+    // Start initialization process
+    initializeApp();
+
+    // Auth event listener setup
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`Auth event: ${event} (visibility: ${document.visibilityState})`);
+
+      // Ignore SIGNED_OUT events that happen due to tab switching
+      if (event === 'SIGNED_OUT' &&
+        document.visibilityState !== 'visible' &&
+        visibilityRef.current === 'visible') {
+        console.log('Preventing automatic sign out during tab visibility change');
+        return;
+      }
+
+      // Special handling for confirmation page
       if (event === 'SIGNED_OUT' && window.location.pathname === '/confirm-success') {
         console.log('Preventing automatic sign out on confirmation page');
 
-        // URLからトークンを取得（ハッシュまたはクエリパラメータから）
+        // Get tokens from URL
         const fragment = window.location.hash.substring(1);
         const params = new URLSearchParams(fragment || window.location.search);
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
 
-        // トークンがある場合はセッションを復元
+        // Restore session if possible
         if (accessToken) {
           console.log('Attempting to restore session from token');
           supabase.auth.setSession({
@@ -68,18 +98,44 @@ const App: React.FC = () => {
       }
     });
 
-    // クリーンアップ関数
+    // Visibility change handler
+    const handleVisibilityChange = () => {
+      const prevState = visibilityRef.current;
+      const currentState = document.visibilityState;
+
+      console.log(`Visibility changed: ${prevState} -> ${currentState}`);
+
+      if (prevState !== 'visible' && currentState === 'visible') {
+        console.log('Tab became visible, checking session status');
+
+        // Light session check
+        supabase.auth.getSession().then(({ data }) => {
+          if (data.session) {
+            console.log('Session exists after tab visibility change');
+          }
+        });
+      }
+
+      // Update reference
+      visibilityRef.current = currentState;
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
     return () => {
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
-  // ↑↑↑ 重要な修正の終了 ↑↑↑
 
-  // Show loading spinner while checking auth status
-  if (loading) {
+  if (!appInitialized || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">ロード中...</p>
+        </div>
       </div>
     );
   }

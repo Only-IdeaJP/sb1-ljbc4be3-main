@@ -1,6 +1,6 @@
-// src/hooks/useAuth.ts の改善部分
+// src/hooks/useAuth.ts
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { HotToast } from '../components/Toaster';
 import { supabase } from '../lib/supabase';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
 import { handleSupabaseError } from '../utils/errorHandler';
+
 /**
  * 認証機能を提供するカスタムフック
  */
@@ -28,16 +29,67 @@ export const useAuth = () => {
     initialize
   } = useAuthStore();
 
+  // 初期化フラグを追加
+  const initializedRef = useRef(false);
+  // ローカルのセッション状態を追跡
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   // セッション変更を監視して状態を同期する
   useEffect(() => {
+    // 既に初期化済みの場合は処理をスキップ
+    if (initializedRef.current) return;
+
+    // 初期化前に現在のセッションを確認
+    const checkCurrentSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          // セッションが存在する場合は初期化
+          await initialize();
+        }
+        setSessionChecked(true);
+        initializedRef.current = true;
+      } catch (err) {
+        console.error("Error checking current session:", err);
+        setSessionChecked(true);
+        initializedRef.current = true;
+      }
+    };
+
+    checkCurrentSession();
+
     // 認証状態の変更を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`Auth event: ${event}`);
+
+      // INITIALセッションイベントは特別に処理
+      if (event === 'INITIAL_SESSION') {
+        // すでに初期化済みの場合は処理をスキップ
+        if (initializedRef.current) {
+          console.log("Initial session event ignored - already initialized");
+          return;
+        }
+
+        if (session) {
+          console.log("Initial session detected, initializing auth state");
+          await initialize();
+        }
+        initializedRef.current = true;
+        setSessionChecked(true);
+        return;
+      }
+
+      // タブフォーカス変更による偽のSIGNED_OUTイベントを無視
+      if (event === 'SIGNED_OUT' && document.visibilityState !== 'visible') {
+        console.log("Ignoring SIGNED_OUT event during tab visibility change");
+        return;
+      }
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // セッションがあれば、ユーザー情報を再取得
         if (session?.user) {
           // ストアの初期化関数を呼び出して最新のユーザー情報を取得
+          console.log("Auth event requires user refresh, initializing...");
           initialize().catch(err => {
             console.error("Error initializing auth state after sign in:", err);
           });
@@ -45,11 +97,34 @@ export const useAuth = () => {
       }
     });
 
+    // visibilitychange イベントリスナーを追加
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // タブが再表示されたときのセッション確認は軽く行う
+        console.log('Tab is visible again, checking session status');
+        supabase.auth.getSession().then(({ data }) => {
+          const hasSession = !!data.session;
+          const hasUser = !!user;
+
+          // セッションとユーザーの不一致がある場合のみ初期化
+          if (hasSession !== hasUser) {
+            console.log("Session state mismatch detected, re-initializing");
+            initialize().catch(err => {
+              console.error("Error refreshing auth state on visibility change:", err);
+            });
+          }
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // クリーンアップ関数
     return () => {
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [initialize]);
+  }, [initialize, user]);
 
   /**
    * メール確認状態を更新する
@@ -141,7 +216,7 @@ export const useAuth = () => {
 
   return {
     user,
-    loading,
+    loading: loading && !sessionChecked, // セッションチェック済みならローディング状態を緩和
     error,
     isAuthenticated: !!user,
     confirmEmail,
@@ -192,7 +267,6 @@ export const useAuth = () => {
         // エラーメッセージを日本語に変換
         const errorMessage = handleSupabaseError(error);
         HotToast.error(errorMessage);
-        // エラーを上位に伝播させる
         // エラーを上位に伝播させる
         throw error;
       }

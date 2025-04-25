@@ -37,6 +37,7 @@ export const ToastContainer: React.FC = () => {
     return (
         <Toaster
             position="top-right"
+            containerClassName='no-print'
             toastOptions={{
                 duration: 3000,
                 style: defaultToastStyle,

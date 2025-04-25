@@ -1,4 +1,4 @@
-// src/store/auth.store.ts の改善部分
+// src/store/auth.store.ts
 
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
@@ -17,6 +17,9 @@ interface AuthStore extends AuthState {
     forceRefresh: () => Promise<void>; // 新しいメソッド: 強制的にユーザー情報を再取得
 }
 
+// 初期化フラグ
+let initializeAttempted = false;
+
 /**
  * 認証状態を管理するZustandストア
  */
@@ -34,7 +37,24 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
      * メール確認状態もチェックします
      */
     initialize: async () => {
+        // すでに進行中の初期化がある場合は重複した実行を避ける
+        const { user, loading } = get();
+
+        // すでに認証済みで、ロード中でもない場合は処理をスキップ
+        if (user && !loading) {
+            console.log("Auth store already initialized with user, skipping");
+            return;
+        }
+
+        // 初期化試行フラグを設定
+        if (initializeAttempted) {
+            console.log("Auth initialization already attempted, avoiding duplicate");
+            return;
+        }
+
+        initializeAttempted = true;
         set({ loading: true, error: null });
+
         try {
             // Supabaseから認証状態を取得
             const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -55,6 +75,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                     .single();
 
                 if (userError) {
+                    // ユーザーデータ取得のエラーは致命的
                     throw userError;
                 }
 
@@ -71,10 +92,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                 }
 
                 // すべての条件をクリアしたらユーザーを設定
-                set({ user: userData as User, loading: false });
+                set({ user: userData as User, loading: false, error: null });
                 console.log("User state initialized successfully:", userData);
             } else {
-                set({ user: null, loading: false });
+                set({ user: null, loading: false, error: null });
+                console.log("No active session found during initialization");
             }
         } catch (error) {
             console.error('Auth initialization error:', error);
@@ -83,6 +105,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                 loading: false,
                 user: null
             });
+        } finally {
+            // 初期化処理が完了
+            set({ loading: false });
         }
     },
 
@@ -92,10 +117,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
      */
     forceRefresh: async () => {
         // 現在のセッション状態を取得
-        const { data: sessionData } = await supabase.auth.getSession();
+        set({ loading: true });
+        try {
+            const { data: sessionData } = await supabase.auth.getSession();
 
-        if (sessionData.session?.user?.id) {
-            try {
+            if (sessionData.session?.user?.id) {
                 // ユーザー情報を再取得
                 const { data: userData, error: userError } = await supabase
                     .from('users')
@@ -107,16 +133,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                 if (userError) throw userError;
 
                 // ユーザー情報を更新
-                set({ user: userData as User });
+                set({ user: userData as User, loading: false, error: null });
                 console.log("User state forcefully refreshed:", userData);
                 return;
-            } catch (error) {
-                console.error("Error refreshing user data:", error);
+            } else {
+                // セッションがなければユーザーをnullに設定
+                set({ user: null, loading: false, error: null });
             }
+        } catch (error) {
+            console.error("Error refreshing user data:", error);
+            set({ loading: false, error: error instanceof Error ? error.message : '更新エラーが発生しました' });
         }
-
-        // セッションがなければユーザーをnullに設定
-        set({ user: null });
     },
 
     /**
@@ -130,7 +157,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             const user = await AuthService.signInWithEmailConfirmation(credentials);
 
             // ユーザー情報を更新
-            set({ user, loading: false });
+            set({ user, loading: false, error: null });
 
             // ログイン後に強制的に情報を再取得（Supabaseの非同期性に対応）
             setTimeout(async () => {
@@ -162,12 +189,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             // メール確認ありのサインアップ処理
             await AuthService.signUpWithEmailConfirmation(data);
             // メール確認待ちの状態なので、ユーザーはnullのまま
-            set({ loading: false, user: null });
+            set({ loading: false, user: null, error: null });
         } catch (error) {
             console.error('Sign up error:', error);
             set({
                 error: error instanceof Error ? error.message : 'アカウント登録に失敗しました',
-                loading: false
+                loading: false,
+                user: null
             });
             throw error;
         }
@@ -180,12 +208,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ loading: true, error: null });
         try {
             await AuthService.signOut();
-            set({ user: null, loading: false });
+            set({ user: null, loading: false, error: null });
+            // 初期化フラグをリセット
+            initializeAttempted = false;
         } catch (error) {
             console.error('Sign out error:', error);
             set({
                 error: error instanceof Error ? error.message : 'ログアウトに失敗しました',
-                loading: false
+                loading: false,
+                user: null
             });
             throw error;
         }
@@ -199,7 +230,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ loading: true, error: null });
         try {
             await AuthService.updatePassword(password);
-            set({ loading: false });
+            set({ loading: false, error: null });
         } catch (error) {
             console.error('Password update error:', error);
             set({
@@ -211,5 +242,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
 }));
 
-// 認証状態を初期化する
-useAuthStore.getState().initialize();
+// 認証状態を初期化する - アプリ起動時に一度だけ実行
+// ただし非同期処理なので、結果は待たない
+useAuthStore.getState().initialize().catch(err => {
+    console.error("Initial auth state initialization failed:", err);
+});

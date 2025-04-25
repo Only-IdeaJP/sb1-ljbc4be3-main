@@ -111,7 +111,17 @@ const ActivityItem = ({
 const LoggedInUserContent = ({ stats }: { stats?: Stats }) => {
   if (!stats) {
     return (
-      <p className="text-center text-red-500">⚠️ データが見つかりません</p>
+      <div className="flex justify-center items-center py-8">
+        <div className="text-center">
+          <p className="text-center text-red-500 mb-4">⚠️ データが見つかりません</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          >
+            再読み込み
+          </button>
+        </div>
+      </div>
     );
   }
 
