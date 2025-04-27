@@ -106,9 +106,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
      */
     forceRefresh: async () => {
         // 現在のセッション状態を取得
-        const { user } = get();
         set({ loading: true });
-
         try {
             const { data: sessionData } = await supabase.auth.getSession();
 
@@ -123,23 +121,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
                 if (userError) throw userError;
 
-                // ユーザー情報に変更がある場合のみ更新とログを出す
-                if (!user || user.id !== userData.id || user.email_confirmed !== userData.email_confirmed) {
-                    console.log("User state updated:", userData);
-                    set({ user: userData as User, loading: false, error: null });
-                } else {
-                    // 変更がない場合は静かに更新
-                    set({ user: userData as User, loading: false, error: null });
-                }
+                // ユーザー情報を更新
+                set({ user: userData as User, loading: false, error: null });
+                console.log("User state forcefully refreshed:", userData);
                 return;
             } else {
                 // セッションがなければユーザーをnullに設定
-                if (user !== null) {
-                    console.log("User session expired, clearing user state");
-                    set({ user: null, loading: false, error: null });
-                } else {
-                    set({ user: null, loading: false, error: null });
-                }
+                set({ user: null, loading: false, error: null });
             }
         } catch (error) {
             console.error("Error refreshing user data:", error);
