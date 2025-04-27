@@ -91,6 +91,27 @@ export const signInWithEmailConfirmation = async ({ email, password }: SignInCre
  */
 export const signUpWithEmailConfirmation = async ({ email, password, userData }: SignUpData): Promise<void> => {
     try {
+        // 既存のユーザーをチェック - 退会済みかどうか
+        const { data: existingUser, error: userCheckError } = await serverSupabase
+            .from('users')
+            .select('is_withdrawn')
+            .eq('email', email)
+            .maybeSingle();
+
+        // 退会済みユーザーが存在し、auth.usersから削除されていない場合の処理
+        if (existingUser?.is_withdrawn) {
+            // サービスロールを使用して古いユーザーデータをクリーンアップ
+            const { error: deleteError } = await serverSupabase
+                .from('users')
+                .delete()
+                .eq('email', email);
+
+            if (deleteError) {
+                console.error('Error cleaning up withdrawn user:', deleteError);
+                // エラーを無視して続行 - 可能であれば新規登録を試みる
+            }
+        }
+
         // リダイレクトURLを設定（メール認証後にリダイレクトされるURL）
         const redirectTo = `${window.location.origin}/confirm-success`;
 
@@ -140,7 +161,7 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
                     nickname: userData.nickname || null,
                     address: userData.address || null,
                     phone: userData.phone || null,
-                    is_withdrawn: false,
+                    is_withdrawn: false,  // 明示的に false を設定
                     email_confirmed: false, // メール確認フラグを追加
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -164,6 +185,41 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
     } catch (error) {
         console.error('Sign up process error:', error);
         throw error instanceof Error ? error : new Error('登録処理中に予期せぬエラーが発生しました');
+    }
+};
+
+/**
+ * ユーザーの完全削除
+ * @param userId ユーザーID
+ */
+export const deleteUser = async (userId: string): Promise<boolean> => {
+    try {
+        // 認証システムからユーザーを削除（サービスロール必要）
+        const { error: authError } = await serverSupabase.auth.admin.deleteUser(
+            userId,
+            false,
+        );
+
+        if (authError) {
+            console.error('認証削除エラー:', authError);
+            return false;
+        }
+
+        // アプリケーションデータからユーザー関連データを削除
+        const { error: dataError } = await serverSupabase
+            .from('users')
+            .delete()
+            .eq('id', userId);
+
+        if (dataError) {
+            console.error('ユーザーデータ削除エラー:', dataError);
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('ユーザー削除エラー:', error);
+        return false;
     }
 };
 

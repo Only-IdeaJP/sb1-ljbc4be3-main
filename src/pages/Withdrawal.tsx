@@ -1,8 +1,8 @@
+import { AlertTriangle } from 'lucide-react';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { AlertTriangle } from 'lucide-react';
 
 export const Withdrawal: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -23,22 +23,27 @@ export const Withdrawal: React.FC = () => {
     setMessage('');
 
     try {
-      // Update user's withdrawal status
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          is_withdrawn: true,
-          withdrawn_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+      // エッジ関数を呼び出してユーザーを完全に削除
+      const { data, error } = await supabase.functions.invoke('complete-user-deletion', {
+        body: { user_id: user.id }
+      });
 
-      if (updateError) throw updateError;
+      if (error) {
+        console.error('ユーザー削除エラー:', error);
+        throw new Error(error.message);
+      }
 
-      // サインアウト
+      if (!data?.success) {
+        throw new Error('ユーザー削除に失敗しました');
+      }
+
+      // ローカルのセッションをクリアしてログアウト
       await signOut();
-      navigate('/login');
+
+      // ログインページにリダイレクト
+      navigate('/login?withdrawal_complete=true');
     } catch (error: any) {
-      console.error('Withdrawal error:', error);
+      console.error('退会処理エラー:', error);
       setMessage(`エラー: アカウントの削除に失敗しました。お手数ですが、サポートまでお問い合わせください。`);
     } finally {
       setLoading(false);
