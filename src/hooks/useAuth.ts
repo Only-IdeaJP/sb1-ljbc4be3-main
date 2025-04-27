@@ -27,13 +27,15 @@ export const useAuth = () => {
     updatePassword: storeUpdatePassword,
     setUser,
     initialize,
-    forceRefresh // 追加: 強制再読み込み関数
+    forceRefresh // 強制再読み込み関数
   } = useAuthStore();
 
   // 初期化フラグを追加
   const initializedRef = useRef(false);
   // ローカルのセッション状態を追跡
   const [sessionChecked, setSessionChecked] = useState(false);
+  // refreshing フラグを追加して再帰的な更新を防止
+  const refreshingRef = useRef(false);
 
   // セッション変更を監視して状態を同期する
   useEffect(() => {
@@ -49,11 +51,16 @@ export const useAuth = () => {
           await initialize();
 
           // ユーザーが正しく取得できたがemail_confirmedがfalseの場合は強制更新
-          if (user && !user.email_confirmed) {
+          // ただし、refreshingRef を使って再帰呼び出しを防止
+          if (user && !user.email_confirmed && !refreshingRef.current) {
             console.log('ユーザーのメール確認状態が未確認です。強制更新を試みます');
+            refreshingRef.current = true;
+
             setTimeout(() => {
               forceRefresh().catch(e => {
                 console.error('強制更新中にエラーが発生しました:', e);
+              }).finally(() => {
+                refreshingRef.current = false;
               });
             }, 500);
           }
@@ -98,11 +105,15 @@ export const useAuth = () => {
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // セッションがあれば、ユーザー情報を再取得
-        if (session?.user) {
+        if (session?.user && !refreshingRef.current) {
+          // refreshingRef を使って再帰呼び出しを防止
+          refreshingRef.current = true;
           // ストアの初期化関数を呼び出して最新のユーザー情報を取得
           console.log("Auth event requires user refresh, initializing...");
           initialize().catch(err => {
             console.error("Error initializing auth state after sign in:", err);
+          }).finally(() => {
+            refreshingRef.current = false;
           });
         }
       }
@@ -110,7 +121,7 @@ export const useAuth = () => {
 
     // visibilitychange イベントリスナーを追加
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !refreshingRef.current) {
         // タブが再表示されたときのセッション確認は軽く行う
         console.log('Tab is visible again, checking session status');
         supabase.auth.getSession().then(({ data }) => {
@@ -118,10 +129,13 @@ export const useAuth = () => {
           const hasUser = !!user;
 
           // セッションとユーザーの不一致がある場合のみ初期化
-          if (hasSession !== hasUser) {
+          if (hasSession !== hasUser && !refreshingRef.current) {
+            refreshingRef.current = true;
             console.log("Session state mismatch detected, re-initializing");
             initialize().catch(err => {
               console.error("Error refreshing auth state on visibility change:", err);
+            }).finally(() => {
+              refreshingRef.current = false;
             });
           }
         });
@@ -136,6 +150,23 @@ export const useAuth = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [initialize, forceRefresh, user]);
+
+  // 安全なデータ更新関数 - 再帰呼び出し防止
+  const safeRefreshUserData = useCallback(async (): Promise<void> => {
+    if (refreshingRef.current) {
+      console.log("Refresh already in progress, skipping...");
+      return;
+    }
+
+    refreshingRef.current = true;
+    try {
+      await forceRefresh();
+    } catch (err) {
+      console.error("Error during safe user refresh:", err);
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, [forceRefresh]);
 
   /**
    * メール確認状態を更新する
@@ -202,11 +233,13 @@ export const useAuth = () => {
       console.log('ログインしました');
       HotToast.success('ログインしました');
 
-      // 1秒後に強制的にユーザー情報を再取得
+      // 1秒後に1回だけユーザー情報を再取得
       setTimeout(() => {
-        forceRefresh().catch(err => {
-          console.error("Error refreshing user data after login:", err);
-        });
+        if (!refreshingRef.current) {
+          safeRefreshUserData().catch(err => {
+            console.error("Error refreshing user data after login:", err);
+          });
+        }
       }, 1000);
     } catch (error) {
       // エラーメッセージを日本語に変換
@@ -222,7 +255,7 @@ export const useAuth = () => {
       // エラーを上位に伝播させる
       throw error;
     }
-  }, [setUser, forceRefresh]);
+  }, [setUser, safeRefreshUserData]);
 
   return {
     user,
@@ -233,7 +266,7 @@ export const useAuth = () => {
     restoreSession,
     checkEmailConfirmed,
     signIn,
-    refreshUserData: forceRefresh, // 追加: 強制再読み込み関数を公開
+    refreshUserData: safeRefreshUserData, // 安全な更新関数を公開
 
     /**
      * 新規ユーザー登録（メール確認あり）

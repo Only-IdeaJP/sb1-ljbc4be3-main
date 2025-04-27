@@ -19,6 +19,8 @@ interface AuthStore extends AuthState {
 
 // 初期化フラグ
 let initializeAttempted = false;
+// 更新中フラグを追加して再帰的な更新を防止
+let isRefreshing = false;
 
 /**
  * 認証状態を管理するZustandストア
@@ -79,8 +81,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                     throw userError;
                 }
 
-                // **ここを削除: メール確認ステータスチェックを削除**
-                // 常にユーザー情報を設定する
+                // ユーザー情報を設定する
                 set({ user: userData as User, loading: false, error: null });
                 console.log("User state initialized successfully:", userData);
             } else {
@@ -103,10 +104,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     /**
      * 強制的にユーザー情報を再取得する
      * ログイン状態のUIが更新されない場合に使用
+     * 再帰的な呼び出しを防止するためにisRefreshingフラグを使用
      */
     forceRefresh: async () => {
+        // すでに更新中なら処理を中止
+        if (isRefreshing) {
+            console.log("Already refreshing user data, skipping redundant call");
+            return;
+        }
+
+        // 更新フラグを設定
+        isRefreshing = true;
+
         // 現在のセッション状態を取得
+        const { user } = get();
         set({ loading: true });
+
         try {
             const { data: sessionData } = await supabase.auth.getSession();
 
@@ -121,17 +134,31 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
                 if (userError) throw userError;
 
-                // ユーザー情報を更新
-                set({ user: userData as User, loading: false, error: null });
-                console.log("User state forcefully refreshed:", userData);
+                // ユーザー情報に変更がある場合のみ更新とログを出す
+                if (!user || user.id !== userData.id || user.email_confirmed !== userData.email_confirmed) {
+                    console.log("User state forcefully refreshed:", userData);
+                    set({ user: userData as User, loading: false, error: null });
+                } else {
+                    // 変更がない場合は静かに更新
+                    set({ user: userData as User, loading: false, error: null });
+                }
                 return;
             } else {
                 // セッションがなければユーザーをnullに設定
-                set({ user: null, loading: false, error: null });
+                if (user !== null) {
+                    console.log("User session expired, clearing user state");
+                    set({ user: null, loading: false, error: null });
+                } else {
+                    set({ user: null, loading: false, error: null });
+                }
             }
         } catch (error) {
             console.error("Error refreshing user data:", error);
             set({ loading: false, error: error instanceof Error ? error.message : '更新エラーが発生しました' });
+        } finally {
+            // 更新完了後にフラグをリセット
+            isRefreshing = false;
+            set({ loading: false });
         }
     },
 
@@ -148,15 +175,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             // ユーザー情報を更新
             set({ user, loading: false, error: null });
 
-            // ログイン後に強制的に情報を再取得（Supabaseの非同期性に対応）
-            setTimeout(async () => {
-                try {
-                    const { forceRefresh } = get();
-                    await forceRefresh();
-                } catch (err) {
-                    console.error("Error during post-login refresh:", err);
-                }
-            }, 100);
+            // ログイン後に一度だけ情報を再取得
+            // ただし既に更新中でなければ
+            if (!isRefreshing) {
+                setTimeout(async () => {
+                    try {
+                        const { forceRefresh } = get();
+                        await forceRefresh();
+                    } catch (err) {
+                        console.error("Error during post-login refresh:", err);
+                    }
+                }, 100);
+            }
         } catch (error) {
             console.error('Sign in error:', error);
             set({
@@ -200,6 +230,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             set({ user: null, loading: false, error: null });
             // 初期化フラグをリセット
             initializeAttempted = false;
+            // 更新フラグもリセット
+            isRefreshing = false;
         } catch (error) {
             console.error('Sign out error:', error);
             set({

@@ -1,5 +1,3 @@
-// src/App.tsx の重要な修正部分
-
 import React, { useEffect, useRef, useState } from "react";
 import {
   Navigate,
@@ -36,12 +34,20 @@ const App: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const visibilityRef = useRef<string>(document.visibilityState);
   const [appInitialized, setAppInitialized] = useState(false);
+  // 認証セッションの検証が進行中かどうかのフラグを追加
+  const authSessionCheckingRef = useRef(false);
 
   // Combined useEffect to handle both auth events and app initialization
   useEffect(() => {
     // App initialization logic
     const initializeApp = async () => {
       try {
+        // 既に検証中なら実行しない
+        if (authSessionCheckingRef.current) {
+          return;
+        }
+
+        authSessionCheckingRef.current = true;
         console.log("Initializing app and checking session...");
         const { data } = await supabase.auth.getSession();
         console.log("Initial session check:", !!data.session);
@@ -49,10 +55,12 @@ const App: React.FC = () => {
         // Short delay to ensure all async processes complete
         setTimeout(() => {
           setAppInitialized(true);
+          authSessionCheckingRef.current = false;
         }, 500);
       } catch (err) {
         console.error("Error during app initialization:", err);
         setAppInitialized(true); // Still mark as initialized on error
+        authSessionCheckingRef.current = false;
       }
     };
 
@@ -108,12 +116,20 @@ const App: React.FC = () => {
       if (prevState !== 'visible' && currentState === 'visible') {
         console.log('Tab became visible, checking session status');
 
-        // Light session check
-        supabase.auth.getSession().then(({ data }) => {
-          if (data.session) {
-            console.log('Session exists after tab visibility change');
-          }
-        });
+        // 既に検証中なら処理をスキップ
+        if (!authSessionCheckingRef.current) {
+          authSessionCheckingRef.current = true;
+
+          // Light session check
+          supabase.auth.getSession().then(({ data }) => {
+            if (data.session) {
+              console.log('Session exists after tab visibility change');
+            }
+            authSessionCheckingRef.current = false;
+          }).catch(() => {
+            authSessionCheckingRef.current = false;
+          });
+        }
       }
 
       // Update reference
@@ -195,6 +211,5 @@ const App: React.FC = () => {
       </div>
     </Router>
   );
-};
-
+}
 export default App;
