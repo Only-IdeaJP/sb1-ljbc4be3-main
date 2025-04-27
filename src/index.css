@@ -84,28 +84,52 @@ body.tag-dragging {
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
 
-  /* 通常の UI をすべて非表示 */
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
   .no-print {
     display: none !important;
   }
 
-  /* 各 .print-page を必ず改ページ */
-  .print-page {
-    page-break-after: always;
-    page-break-inside: avoid;
-    break-after: page;
-    break-inside: avoid;
+  .print-container {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
     margin: 0;
     padding: 0;
+
+    /* avoid splitting the container itself across pages */
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
-  /* ページ全体を使う */
-  html,
-  body {
+  /* every container but the last: break after */
+  .print-container:not(:last-child) {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* last container: no forced break */
+  .print-container:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .print-container img {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    margin: 0;
-    padding: 0;
+    object-fit: contain;
+    /* or “cover” if slight crop is OK */
   }
 }

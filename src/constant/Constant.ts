@@ -195,10 +195,10 @@ export const getTagStyle = (tag: string): string =>
 // ナビゲーションリンク
 export const NAV_LINKS = [
     { to: "/", label: "ホーム" },
-    { to: "/all", label: "全ページ管理" },
+    { to: "/upload", label: "問題アップロード" },
     { to: "/practice", label: "ペーパー演習" },
     { to: "/grade", label: "丸付け" },
-    { to: "/upload", label: "問題アップロード" },
+    { to: "/all", label: "全ページ管理" },
 ];
 
 // フッターリンク
