@@ -12,9 +12,7 @@ export const PracticePrintView: React.FC<PracticePrintViewProps> = ({ papers }) 
         <div className="hidden print:block">
             {papers.map((paper, idx) => (
                 <div key={paper.id} className="print-container">
-                    <h2 className="text-center text-xl font-bold mb-4">
-                        問題 {idx + 1}
-                    </h2>
+
                     <img
                         src={paper.file_path}
                         alt={`問題 ${idx + 1}`}
