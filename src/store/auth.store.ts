@@ -14,7 +14,7 @@ interface AuthStore extends AuthState {
     signUp: (data: SignUpData) => Promise<void>;
     signOut: () => Promise<void>;
     updatePassword: (password: string) => Promise<void>;
-    forceRefresh: () => Promise<void>; // 新しいメソッド: 強制的にユーザー情報を再取得
+    forceRefresh: () => Promise<void>; // 強制的にユーザー情報を再取得
 }
 
 // 初期化フラグ
@@ -66,7 +66,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             if (sessionData.session) {
                 const userId = sessionData.session.user.id;
 
-                // データベースからメール確認状態を取得
+                // データベースからユーザー情報を取得（メール確認状態含む）
                 const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('*')
@@ -79,19 +79,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                     throw userError;
                 }
 
-                // メール確認状態をチェック
-                if (!userData || !userData.email_confirmed) {
-                    // メール未確認の場合はログアウト
-                    await supabase.auth.signOut();
-                    set({
-                        user: null,
-                        loading: false,
-                        error: 'メールアドレスの確認が完了していません。メールの確認リンクをクリックしてください。'
-                    });
-                    return;
-                }
-
-                // すべての条件をクリアしたらユーザーを設定
+                // **ここを削除: メール確認ステータスチェックを削除**
+                // 常にユーザー情報を設定する
                 set({ user: userData as User, loading: false, error: null });
                 console.log("User state initialized successfully:", userData);
             } else {

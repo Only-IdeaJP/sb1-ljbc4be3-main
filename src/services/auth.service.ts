@@ -81,6 +81,27 @@ export const signInWithEmailConfirmation = async ({ email, password }: SignInCre
         throw new Error('このアカウントは退会済みです。新規登録が必要です。');
     }
 
+    // メール確認チェック - 未確認ならここで確認済みに更新する
+    if (!userData.email_confirmed) {
+        console.log('メール確認済みに更新します');
+
+        // サービスロールを使ってメール確認ステータスを更新
+        const { error: updateError } = await serverSupabase
+            .from('users')
+            .update({ email_confirmed: true })
+            .eq('id', data.user.id);
+
+        if (updateError) {
+            console.error('メール確認ステータス更新エラー:', updateError);
+            // 更新に失敗した場合でもユーザーにはエラーを表示しない
+        } else {
+            console.log('メール確認ステータスの更新に成功しました');
+
+            // 更新成功後、userData.email_confirmedも更新
+            userData.email_confirmed = true;
+        }
+    }
+
     return userData as User;
 };
 
@@ -161,7 +182,7 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
                     nickname: userData.nickname || null,
                     address: userData.address || null,
                     phone: userData.phone || null,
-                    is_withdrawn: false,  // 明示的に false を設定
+                    is_withdrawn: false,
                     email_confirmed: false, // メール確認フラグを追加
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -329,6 +350,28 @@ export const getCurrentUser = async (): Promise<User | null> => {
             return null;
         }
 
+        // ユーザーデータが存在するがメール確認がまだの場合は確認済みに更新
+        if (userData && !userData.email_confirmed) {
+            console.log('getCurrentUser: メール確認済みに更新します');
+
+            try {
+                // サービスロールを使ってメール確認ステータスを更新
+                const { error: updateError } = await serverSupabase
+                    .from('users')
+                    .update({ email_confirmed: true })
+                    .eq('id', authUser.id);
+
+                if (updateError) {
+                    console.error('メール確認ステータス更新エラー:', updateError);
+                } else {
+                    console.log('メール確認ステータスの更新に成功しました');
+                    userData.email_confirmed = true;
+                }
+            } catch (updateErr) {
+                console.error('メール確認更新時の例外:', updateErr);
+            }
+        }
+
         return userData as User;
     } catch (error) {
         console.error('Get current user error:', error);
@@ -455,6 +498,28 @@ export const AuthService: IAuthService = {
         if (userDataError || !userData) {
             await supabase.auth.signOut();
             throw new Error('このアカウントは退会済みです。新規登録が必要です。');
+        }
+
+        // メール確認されていない場合は確認済みに更新
+        if (!userData.email_confirmed) {
+            console.log('AuthService.signIn: メール確認済みに更新します');
+
+            try {
+                // サービスロールを使ってメール確認ステータスを更新
+                const { error: updateError } = await serverSupabase
+                    .from('users')
+                    .update({ email_confirmed: true })
+                    .eq('id', data.user.id);
+
+                if (updateError) {
+                    console.error('メール確認ステータス更新エラー:', updateError);
+                } else {
+                    console.log('メール確認ステータスの更新に成功しました');
+                    userData.email_confirmed = true;
+                }
+            } catch (updateErr) {
+                console.error('メール確認更新時の例外:', updateErr);
+            }
         }
 
         return userData as User;

@@ -2,8 +2,9 @@
 
 import { CheckCircle } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { HotToast } from "../components/Toaster";
+import { useAuth } from "../hooks/useAuth";
 import { serverSupabase } from "../lib/server-supabase";
 import { extractAuthTokens } from "../utils/token-extractor";
 
@@ -12,11 +13,13 @@ import { extractAuthTokens } from "../utils/token-extractor";
  * ユーザーがメール内の確認リンクをクリックした後に表示されるページ
  */
 export const EmailConfirmSuccess: React.FC = () => {
+    const navigate = useNavigate();
     const [updating, setUpdating] = useState(false);
     const [updated, setUpdated] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
     const processedRef = useRef(false);
+    const { refreshUserData } = useAuth(); // 追加: ユーザーデータ更新関数を取得
 
     // 1回だけ処理を実行するための副作用
     useEffect(() => {
@@ -50,6 +53,13 @@ export const EmailConfirmSuccess: React.FC = () => {
                     setUserEmail(email);
                     setUpdated(true);
                     HotToast.success('メールアドレスの確認が完了しました！');
+
+                    // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
+                    await refreshUserData();
+                    setTimeout(() => {
+                        navigate('/');
+                    }, 5000);
+
                     return;
                 }
 
@@ -80,6 +90,13 @@ export const EmailConfirmSuccess: React.FC = () => {
                     setUserEmail(email);
                     setUpdated(true);
                     HotToast.success('メールアドレスの確認が完了しました！');
+
+                    // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
+                    await refreshUserData();
+                    setTimeout(() => {
+                        navigate('/');
+                    }, 5000);
+
                     return;
                 }
 
@@ -112,6 +129,13 @@ export const EmailConfirmSuccess: React.FC = () => {
                     localStorage.removeItem('pending_email');
                     setUpdated(true);
                     HotToast.success('メールアドレスの確認が完了しました！');
+
+                    // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
+                    await refreshUserData();
+                    setTimeout(() => {
+                        navigate('/');
+                    }, 5000);
+
                     return;
                 }
 
@@ -127,7 +151,7 @@ export const EmailConfirmSuccess: React.FC = () => {
         };
 
         updateEmailConfirmation();
-    }, [updated]);
+    }, [updated, navigate, refreshUserData]);
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-12">
@@ -142,7 +166,8 @@ export const EmailConfirmSuccess: React.FC = () => {
 
                 <p className="text-gray-600 mb-6">
                     おめでとうございます！メールアドレスの確認が完了しました。<br />
-                    これでサービスの全ての機能をご利用いただけます。
+                    これでサービスの全ての機能をご利用いただけます。<br />
+                    間もなくホームページに自動的に移動します。
                 </p>
 
                 {error ? (
@@ -155,7 +180,7 @@ export const EmailConfirmSuccess: React.FC = () => {
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                         <p className="text-green-800">
                             {updating ? "確認処理中..." :
-                                updated ? `${userEmail ? userEmail + 'の' : ''}メール確認が完了しました。` :
+                                updated ? `${userEmail ? userEmail + 'の' : ''}メール確認が完了しました。5秒後にホームページに移動します。` :
                                     "メール確認処理中..."}
                         </p>
                     </div>

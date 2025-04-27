@@ -26,7 +26,8 @@ export const useAuth = () => {
     signOut: storeSignOut,
     updatePassword: storeUpdatePassword,
     setUser,
-    initialize
+    initialize,
+    forceRefresh // 追加: 強制再読み込み関数
   } = useAuthStore();
 
   // 初期化フラグを追加
@@ -46,6 +47,16 @@ export const useAuth = () => {
         if (data.session) {
           // セッションが存在する場合は初期化
           await initialize();
+
+          // ユーザーが正しく取得できたがemail_confirmedがfalseの場合は強制更新
+          if (user && !user.email_confirmed) {
+            console.log('ユーザーのメール確認状態が未確認です。強制更新を試みます');
+            setTimeout(() => {
+              forceRefresh().catch(e => {
+                console.error('強制更新中にエラーが発生しました:', e);
+              });
+            }, 500);
+          }
         }
         setSessionChecked(true);
         initializedRef.current = true;
@@ -124,7 +135,7 @@ export const useAuth = () => {
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [initialize, user]);
+  }, [initialize, forceRefresh, user]);
 
   /**
    * メール確認状態を更新する
@@ -182,7 +193,7 @@ export const useAuth = () => {
    */
   const signIn = useCallback(async (email: string, password: string): Promise<void> => {
     try {
-      // メール確認済みのユーザーのみログイン可能
+      // メール確認の有無に関わらずログイン処理を行う
       const userData = await signInWithEmailConfirmation({ email, password });
 
       // ユーザー情報を更新
@@ -191,13 +202,12 @@ export const useAuth = () => {
       console.log('ログインしました');
       HotToast.success('ログインしました');
 
-      // 強制的にページリロードせずに状態を更新する対策
-      // ちょっと遅延させてからユーザー情報を再更新（UIが反映される時間を確保）
+      // 1秒後に強制的にユーザー情報を再取得
       setTimeout(() => {
-        initialize().catch(err => {
+        forceRefresh().catch(err => {
           console.error("Error refreshing user data after login:", err);
         });
-      }, 100);
+      }, 1000);
     } catch (error) {
       // エラーメッセージを日本語に変換
       const errorMessage = handleSupabaseError(error);
@@ -212,7 +222,7 @@ export const useAuth = () => {
       // エラーを上位に伝播させる
       throw error;
     }
-  }, [initialize, setUser]);
+  }, [setUser, forceRefresh]);
 
   return {
     user,
@@ -223,6 +233,7 @@ export const useAuth = () => {
     restoreSession,
     checkEmailConfirmed,
     signIn,
+    refreshUserData: forceRefresh, // 追加: 強制再読み込み関数を公開
 
     /**
      * 新規ユーザー登録（メール確認あり）
@@ -289,5 +300,5 @@ export const useAuth = () => {
         throw error;
       }
     }
-  };
-};
+  }
+}

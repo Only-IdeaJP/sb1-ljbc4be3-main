@@ -1,8 +1,7 @@
 // components/ProtectedRoute.tsx
 
 import React, { useEffect } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { HotToast } from "../components/Toaster";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 interface ProtectedRouteProps {
@@ -11,26 +10,26 @@ interface ProtectedRouteProps {
 
 /**
  * 認証が必要なルートを保護するコンポーネント
- * メール確認済みのユーザーのみアクセス可能
+ * 認証済みのユーザーのみアクセス可能
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading, error } = useAuth();
+  const { user, loading, refreshUserData } = useAuth();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
 
   // 保護されたルートの定義
   const protectedRoutes = ["/upload", "/all", "/practice", "/grade"];
   const requiresAuth =
     protectedRoutes.includes(pathname) || pathname.startsWith("/mypage");
 
-  // 認証エラーがある場合（メール未確認など）
+  // メール確認チェックを削除し、代わりにユーザー情報の再取得を行う
   useEffect(() => {
-    if (error && error.includes('メールアドレスの確認')) {
-      HotToast.error('メールアドレスの確認が必要です');
-      // メール確認案内ページへリダイレクト
-      navigate('/email-confirmation?error=true');
+    if (user && requiresAuth) {
+      // ユーザーが存在しているが念のためデータを一度更新
+      refreshUserData().catch(err => {
+        console.error("Failed to refresh user data in protected route:", err);
+      });
     }
-  }, [error, navigate]);
+  }, [user, requiresAuth, refreshUserData]);
 
   // 認証状態の読み込み中はローディングスピナーを表示
   if (loading) {
