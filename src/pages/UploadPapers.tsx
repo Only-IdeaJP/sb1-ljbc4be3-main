@@ -464,7 +464,7 @@ const UploadPapers: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             <TagIcon className="w-5 h-5 inline-block mr-2 text-indigo-600" />
-            タグを選択（長押しすると、ドラッグ＆ドロップできます）
+            タグを選択（長押しすると、ドラッグ＆ドロップできます）。タグ付けは、必須ではありません。
           </h3>
           <div className="flex flex-wrap gap-2 mb-4">
             {DEFAULT_TAGS.map((tag) => (
