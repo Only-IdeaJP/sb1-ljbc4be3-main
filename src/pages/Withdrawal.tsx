@@ -1,8 +1,10 @@
 import { AlertTriangle } from 'lucide-react';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { HotToast } from '../components/Toaster';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+
 
 export const Withdrawal: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -39,6 +41,12 @@ export const Withdrawal: React.FC = () => {
 
       // ローカルのセッションをクリアしてログアウト
       await signOut();
+      // 5. ローカルストレージのクリア
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // 6. 成功メッセージを表示してログインページにリダイレクト
+      HotToast.success('退会処理が完了しました。ご利用ありがとうございました。');
 
       // ログインページにリダイレクト
       navigate('/login?withdrawal_complete=true');

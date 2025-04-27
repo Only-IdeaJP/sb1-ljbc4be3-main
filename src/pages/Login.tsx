@@ -36,6 +36,20 @@ export const Login: React.FC = () => {
       HotToast.success('パスワードを変更しました。新しいパスワードでログインしてください。');
     }
 
+    // 退会完了の場合
+    if (params.get('withdrawal_complete') === 'true') {
+
+
+      // ローカルストレージをクリア
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // URLからパラメータを削除
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+
+
     // エラーがある場合
     const errorParam = params.get('error');
     if (errorParam) {
