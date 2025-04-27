@@ -56,9 +56,7 @@ export const EmailConfirmSuccess: React.FC = () => {
 
                     // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
                     await refreshUserData();
-                    setTimeout(() => {
-                        navigate('/');
-                    }, 5000);
+
 
                     return;
                 }
@@ -93,9 +91,7 @@ export const EmailConfirmSuccess: React.FC = () => {
 
                     // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
                     await refreshUserData();
-                    setTimeout(() => {
-                        navigate('/');
-                    }, 5000);
+
 
                     return;
                 }
@@ -132,9 +128,7 @@ export const EmailConfirmSuccess: React.FC = () => {
 
                     // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
                     await refreshUserData();
-                    setTimeout(() => {
-                        navigate('/');
-                    }, 5000);
+
 
                     return;
                 }
