@@ -68,7 +68,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             if (sessionData.session) {
                 const userId = sessionData.session.user.id;
 
-                // データベースからユーザー情報を取得（メール確認状態含む）
+                // メール確認状態はセッションのユーザー情報から直接確認可能
+                const isEmailConfirmed = sessionData.session.user.email_confirmed_at != null;
+
+                if (!isEmailConfirmed) {
+                    console.log('User email is not confirmed');
+                    // メール未確認の場合の処理をここに追加
+                }
+
+                // データベースからユーザー情報を取得
                 const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('*')
@@ -77,7 +85,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                     .single();
 
                 if (userError) {
-                    // ユーザーデータ取得のエラーは致命的
                     throw userError;
                 }
 

@@ -1,8 +1,9 @@
 // components/ProtectedRoute.tsx
 
 import React, { useEffect } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { supabase } from "../lib/supabase";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,21 +16,28 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading, refreshUserData } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   // 保護されたルートの定義
   const protectedRoutes = ["/upload", "/all", "/practice", "/grade"];
   const requiresAuth =
     protectedRoutes.includes(pathname) || pathname.startsWith("/mypage");
 
-  // メール確認チェックを削除し、代わりにユーザー情報の再取得を行う
+  // メール確認のチェックをSupabaseの内部状態に任せる
   useEffect(() => {
     if (user && requiresAuth) {
-      // ユーザーが存在しているが念のためデータを一度更新
-      refreshUserData().catch(err => {
-        console.error("Failed to refresh user data in protected route:", err);
+      // ユーザーが存在する場合はセッション状態をチェック
+      supabase.auth.getSession().then(({ data }) => {
+        // メール確認状態はAuthユーザーから直接確認
+        const emailConfirmed = data.session?.user?.email_confirmed_at != null;
+
+        if (!emailConfirmed) {
+          // メール未確認の場合は確認ページにリダイレクト
+          navigate('/email-confirmation?error=true', { replace: true });
+        }
       });
     }
-  }, [user, requiresAuth, refreshUserData]);
+  }, [user, requiresAuth, navigate]);
 
   // 認証状態の読み込み中はローディングスピナーを表示
   if (loading) {

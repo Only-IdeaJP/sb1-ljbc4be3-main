@@ -183,7 +183,6 @@ export const signUpWithEmailConfirmation = async ({ email, password, userData }:
                     address: userData.address || null,
                     phone: userData.phone || null,
                     is_withdrawn: false,
-                    email_confirmed: false, // メール確認フラグを追加
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 }]);
@@ -251,19 +250,26 @@ export const deleteUser = async (userId: string): Promise<boolean> => {
  */
 export const checkEmailConfirmation = async (userId: string): Promise<boolean> => {
     try {
-        const { data, error } = await serverSupabase  // サーバーサイド権限で確認
-            .from('users')
-            .select('email_confirmed')
-            .eq('id', userId)
-            .single();
+        // Supabaseから直接ユーザー情報を取得
+        const { data: userData, error } = await supabase.auth.admin.getUserById(userId);
 
         if (error) throw error;
-        return data?.email_confirmed || false;
+
+        // email_confirmedではなく、Supabaseの内部状態を確認
+        return userData?.user?.email_confirmed_at != null;
     } catch (error) {
         console.error('Email confirmation check error:', error);
         return false;
     }
 };
+/**
+ * メール確認処理後の追加処理 - カスタムフィールドの更新は不要に
+ * @param userId ユーザーID
+ */
+export const handleSuccessfulEmailConfirmation = async (userId: string): Promise<void> => {
+    // 特別な処理が必要な場合はここに追加
+    console.log(`User ${userId} has confirmed their email address`);
+}
 
 /**
  * メール確認状態を更新する

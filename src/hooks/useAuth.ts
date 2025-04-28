@@ -8,7 +8,6 @@ import {
   updatePassword as authUpdatePassword,
   checkEmailConfirmation,
   setUserSession,
-  signInWithEmailConfirmation,
   signUpWithEmailConfirmation,
   updateEmailConfirmation
 } from '../services/auth.service';
@@ -225,7 +224,10 @@ export const useAuth = () => {
   const signIn = useCallback(async (email: string, password: string): Promise<void> => {
     try {
       // メール確認の有無に関わらずログイン処理を行う
-      const userData = await signInWithEmailConfirmation({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       // ユーザー情報を更新
       setUser(userData);

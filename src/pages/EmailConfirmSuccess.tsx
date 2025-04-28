@@ -33,31 +33,26 @@ export const EmailConfirmSuccess: React.FC = () => {
                 console.log("Email confirmation process started");
 
                 // URLからトークン情報を抽出
-                const { userId, email } = extractAuthTokens();
+                const { userId, email, accessToken, refreshToken } = extractAuthTokens();
                 console.log(`Extracted token info: userId=${userId}, email=${email}`);
 
-                // ユーザーIDが取得できた場合
-                if (userId) {
-                    // サーバーサイドのSupabaseクライアントでデータベースを直接更新
-                    const { error: updateError } = await serverSupabase
-                        .from('users')
-                        .update({ email_confirmed: true })
-                        .eq('id', userId);
+                // アクセストークンがある場合はセッションを復元
+                if (accessToken) {
+                    console.log('Restoring session from token');
+                    await serverSupabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken || '',
+                    });
 
-                    if (updateError) {
-                        console.error("Database update error:", updateError);
-                        throw new Error("メール確認ステータスの更新に失敗しました");
-                    }
+                    // Supabase Auth自体がemail_confirmed_atを管理するため、
+                    // ユーザーテーブルのemail_confirmedフィールドの更新は不要
 
-                    console.log(`Successfully updated email confirmation for user ${userId}`);
                     setUserEmail(email);
                     setUpdated(true);
                     HotToast.success('メールアドレスの確認が完了しました！');
 
-                    // 成功したらユーザーデータを更新して、5秒後にホームページに遷移
+                    // セッションが確立したらユーザーデータを更新
                     await refreshUserData();
-
-
                     return;
                 }
 
