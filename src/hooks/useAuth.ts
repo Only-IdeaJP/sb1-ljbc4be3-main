@@ -223,11 +223,30 @@ export const useAuth = () => {
    */
   const signIn = useCallback(async (email: string, password: string): Promise<void> => {
     try {
-      // メール確認の有無に関わらずログイン処理を行う
+      // Supabase認証を使用してログイン
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
+      if (error) throw error;
+
+      // メール確認状態をチェック
+      if (!data.user.email_confirmed_at) {
+        throw new Error('メールアドレスの確認が完了していません。メールの確認リンクをクリックしてください。');
+      }
+
+      // ユーザー情報をデータベースから取得
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .eq('is_withdrawn', false)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('ユーザー情報の取得に失敗しました');
+      }
 
       // ユーザー情報を更新
       setUser(userData);
@@ -235,7 +254,7 @@ export const useAuth = () => {
       console.log('ログインしました');
       HotToast.success('ログインしました');
 
-      // 1秒後に1回だけユーザー情報を再取得
+      // ユーザー情報の再取得処理
       setTimeout(() => {
         if (!refreshingRef.current) {
           safeRefreshUserData().catch(err => {
@@ -254,11 +273,11 @@ export const useAuth = () => {
       } else {
         HotToast.error(errorMessage);
       }
+
       // エラーを上位に伝播させる
       throw error;
     }
   }, [setUser, safeRefreshUserData]);
-
   return {
     user,
     loading: loading && !sessionChecked, // セッションチェック済みならローディング状態を緩和
