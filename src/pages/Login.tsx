@@ -1,7 +1,7 @@
 // pages/Login.tsx
 
 import React, { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { HotToast } from '../components/Toaster';
 import { LoginForm } from '../features/auth/components/LoginForm';
 import { RegisterForm } from '../features/auth/components/RegisterForm';
@@ -11,10 +11,19 @@ import { useAuth } from '../hooks/useAuth';
  * ログイン・新規登録ページ
  */
 export const Login: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const location = useLocation();
 
+  // location か searchParams の変更を検知するため、state 初期化をここではしない
+  const [isLogin, setIsLogin] = useState(true);
+
+  // location が変わったときに isLogin を更新する
+  useEffect(() => {
+    const register = searchParams.get('register');
+    // register=true の場合は新規登録フォーム、それ以外の場合はログインフォームを表示
+    setIsLogin(register !== 'true');
+  }, [location, searchParams]);
 
   // クエリパラメータを確認
   useEffect(() => {
@@ -38,8 +47,6 @@ export const Login: React.FC = () => {
 
     // 退会完了の場合
     if (params.get('withdrawal_complete') === 'true') {
-
-
       // ローカルストレージをクリア
       localStorage.clear();
       sessionStorage.clear();
@@ -48,7 +55,6 @@ export const Login: React.FC = () => {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
-
 
     // エラーがある場合
     const errorParam = params.get('error');
@@ -63,8 +69,16 @@ export const Login: React.FC = () => {
   }
 
   const toggleForm = () => {
+    // フォーム切り替え時に URL も更新する
+    const newUrl = isLogin
+      ? '/login?register=true'
+      : '/login';
+
+    window.history.replaceState({}, '', newUrl);
     setIsLogin(!isLogin);
   };
+
+  console.log('Rendering login page, isLogin:', isLogin);
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

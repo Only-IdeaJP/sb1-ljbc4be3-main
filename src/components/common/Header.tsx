@@ -31,6 +31,7 @@ const Header = () => {
                   <p className="text-sm text-gray-600">
                     今日最適な20枚を自動生成する。親子にハグするゆとりを。
                   </p>
+                  {/* ここでログインリンクを明示的に /login に設定し、register パラメータを含めない */}
                   <Link
                     to={user ? "/mypage/profile" : "/login"}
                     className="text-gray-600 hover:text-indigo-600 flex items-center space-x-2"

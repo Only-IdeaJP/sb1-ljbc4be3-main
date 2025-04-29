@@ -575,14 +575,14 @@ const UploadPapers: React.FC = () => {
             アップロード完了
           </h3>
           <p className="text-green-700 mb-4">
-            全てのファイルのアップロードが完了しました。タグの編集を続けるか、全ページ管理画面に移動してタグを管理できます。
+            全てのファイルのアップロードが完了しました。次は、ペーパー演習から、好きな枚数のドリルを作成しましょう！。
           </p>
           <div className="flex space-x-4">
             <button
-              onClick={() => navigate("/all")}
+              onClick={() => navigate("/practice")}
               className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition-colors"
             >
-              全ページ管理へ
+              ペーパー演習へ
             </button>
           </div>
         </div>

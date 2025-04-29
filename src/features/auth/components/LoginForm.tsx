@@ -94,6 +94,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
         }
     };
 
+    // 新規登録ページへの切り替えハンドラー
+    const handleToggleForm = () => {
+        // フォームを切り替え
+        onToggleForm();
+
+        // URLを更新
+        window.history.replaceState({}, '', '/login?register=true');
+    };
+
     // ログイン成功後の表示
     if (loginSuccess) {
         return (
@@ -266,7 +275,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleForm }) => {
                 <div className="text-center mt-4">
                     <button
                         type="button"
-                        onClick={onToggleForm}
+                        onClick={handleToggleForm}
                         className="text-indigo-600 hover:text-indigo-500 focus:outline-none"
                     >
                         アカウントをお持ちではありませんか？ 無料登録はこちら
