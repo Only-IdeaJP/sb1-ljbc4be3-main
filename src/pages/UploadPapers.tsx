@@ -575,7 +575,7 @@ const UploadPapers: React.FC = () => {
             アップロード完了
           </h3>
           <p className="text-green-700 mb-4">
-            全てのファイルのアップロードが完了しました。次は、ペーパー演習から、好きな枚数のドリルを作成しましょう！。
+            全てのファイルのアップロードが完了しました。次は、ペーパー演習から、好きな枚数のドリルを作成しましょう！
           </p>
           <div className="flex space-x-4">
             <button
