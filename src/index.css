@@ -6,6 +6,13 @@
 /* タグのスタイリング用のユーティリティクラス */
 .tag {
   @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Safari */
+  -moz-user-select: none;
+  /* Firefox */
+  -ms-user-select: none;
+  /* IE10+ */
 }
 
 /* タグの色クラス */

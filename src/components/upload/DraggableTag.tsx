@@ -1,21 +1,18 @@
-// src/components/upload/DraggableTag.tsx の修正
-
 import { Tag as TagIcon } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { TAG_COLORS, TagStyle } from "../../constant/Constant";
 
 interface DraggableTagProps {
     tag: string;
     onClick?: () => void;
-    onDragStart?: () => void;
-    onDragEnd?: () => void;
+    onDragStart?: () => void; // Optional callbacks
+    onDragEnd?: () => void;   // Optional callbacks
     className?: string;
 }
 
-/**
- * ドラッグ可能なタグコンポーネント
- * タグのドラッグ＆ドロップ機能を提供、タグごとに色分け
- */
+// Keep track of the currently hovered drop target during a touch drag
+let currentDropTargetElement: Element | null = null;
+
 const DraggableTag: React.FC<DraggableTagProps> = ({
     tag,
     onClick,
@@ -23,255 +20,309 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
     onDragEnd,
     className = "",
 }) => {
-    // タグ用の色を直接TAG_COLORSから取得
     const tagStyle: TagStyle = TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
-    // タッチデバイス検出のための状態
     const [isTouchDevice, setIsTouchDevice] = useState(false);
-    // タッチドラッグ中の状態
     const [isTouchDragging, setIsTouchDragging] = useState(false);
-    // 最後のタッチ位置
-    const [lastTouch, setLastTouch] = useState({ clientX: 0, clientY: 0 });
+    const lastTouchRef = useRef({ clientX: 0, clientY: 0 });
+    const dragStartThreshold = 10; // Pixels to move before drag starts
 
-    // コンポーネントマウント時にタッチデバイスか確認
     useEffect(() => {
+        // Check for touch support only once
         setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    }, []);
 
-    /**
-     * ドラッグ開始ハンドラ
-     */
+        // Cleanup function to reset state if component unmounts mid-drag
+        return () => {
+            if (isTouchDragging) { // Use the state directly here
+                cleanupTouchDrag();
+            }
+            currentDropTargetElement = null; // Reset global tracker on unmount
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run only on mount
+
+    // Native HTML5 Drag Handlers (for desktop)
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-        // ドラッグデータをセット
+        if (isTouchDevice) return; // Prevent conflict with touch
+
         e.dataTransfer.setData('tag', tag);
         e.dataTransfer.effectAllowed = "copy";
 
-        // フィードバック画像のカスタマイズ
+        // Optional: Custom drag image (already implemented)
         if (e.dataTransfer.setDragImage) {
-            // タグのクローンを作成
             const tagEl = e.currentTarget.cloneNode(true) as HTMLElement;
             tagEl.style.position = 'absolute';
-            tagEl.style.top = '-1000px';
+            tagEl.style.top = '-1000px'; // Position off-screen
             tagEl.style.opacity = '0.8';
             document.body.appendChild(tagEl);
-
-            // ドラッグ画像を設定
-            e.dataTransfer.setDragImage(tagEl, 10, 10);
-
-            // 遅延してクリーンアップ
-            setTimeout(() => {
-                document.body.removeChild(tagEl);
-            }, 0);
+            e.dataTransfer.setDragImage(tagEl, 10, 10); // Adjust offset as needed
+            setTimeout(() => document.body.removeChild(tagEl), 0);
         }
 
-        // ドラッグ開始時のクラスを追加
         document.body.classList.add('tag-dragging');
-
-        if (onDragStart) {
-            onDragStart();
-        }
+        onDragStart?.();
     };
 
-    /**
-     * ドラッグ終了ハンドラ
-     */
     const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-        // デバッグ情報
-        console.log(`Drag ended for tag: ${tag}`);
-        console.log("Drag result:", e.dataTransfer.dropEffect);
+        if (isTouchDevice) return;
 
-        // ドラッグ終了時のクラスを削除
         document.body.classList.remove('tag-dragging');
-
-        if (onDragEnd) {
-            onDragEnd();
-        }
+        console.log(`Drag ended for tag: ${tag}. Drop effect: ${e.dataTransfer.dropEffect}`);
+        onDragEnd?.();
     };
 
-    // タッチ開始ハンドラ
+    // Touch Event Handlers (for mobile/touch devices)
     const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
         if (!isTouchDevice) return;
+        // Only respond to single touch
+        if (e.touches.length !== 1) return;
 
-        // クリックイベントが先に発生しないように
-        e.preventDefault();
+        // Prevent potential conflicts (like triggering click after drag)
+        // e.preventDefault(); // Be cautious: might prevent scrolling if needed nearby
 
-        // 最初のタッチポイントを保存
-        if (e.touches.length === 1) {
-            const touch = e.touches[0];
-            setLastTouch({
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-        }
+        const touch = e.touches[0];
+        lastTouchRef.current = { clientX: touch.clientX, clientY: touch.clientY };
+        // Reset dragging state at the start of a new touch
+        setIsTouchDragging(false);
     };
 
-    // タッチ移動ハンドラ
     const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-        if (!isTouchDevice || isTouchDragging) return;
+        if (!isTouchDevice) return;
+        if (e.touches.length !== 1) return; // Only track single finger drag
 
-        if (e.touches.length === 1) {
-            const touch = e.touches[0];
+        const touch = e.touches[0];
+        const currentX = touch.clientX;
+        const currentY = touch.clientY;
 
-            // 移動距離が閾値を超えたらドラッグ開始
-            const deltaX = Math.abs(touch.clientX - lastTouch.clientX);
-            const deltaY = Math.abs(touch.clientY - lastTouch.clientY);
+        if (!isTouchDragging) {
+            // Check if movement exceeds threshold to start drag
+            const deltaX = Math.abs(currentX - lastTouchRef.current.clientX);
+            const deltaY = Math.abs(currentY - lastTouchRef.current.clientY);
 
-            if (deltaX > 10 || deltaY > 10) {
+            if (deltaX > dragStartThreshold || deltaY > dragStartThreshold) {
                 setIsTouchDragging(true);
-
-                // ドラッグ開始時の処理
                 document.body.classList.add('tag-dragging');
-
-                // カスタムイベントでドラッグデータを伝える
-                const customEvent = new CustomEvent('tagdragstart', {
-                    bubbles: true,
-                    detail: { tag, element: e.currentTarget }
-                });
-                e.currentTarget.dispatchEvent(customEvent);
-
-                if (onDragStart) {
-                    onDragStart();
-                }
-
-                // タグのクローンを作成してドラッグ視覚効果として表示
-                const ghostTag = document.createElement('div');
-                ghostTag.id = 'touch-drag-ghost';
-                ghostTag.innerText = tag;
-                ghostTag.className = `fixed z-50 ${tagStyle.bg} ${tagStyle.text} py-1 px-3 rounded-full opacity-80 pointer-events-none`;
-                document.body.appendChild(ghostTag);
-
-                // ゴーストタグの位置を更新
-                updateGhostPosition(touch.clientX, touch.clientY);
+                createGhostElement(tag, tagStyle);
+                updateGhostPosition(currentX, currentY); // Initial position
+                lastTouchRef.current = { clientX: currentX, clientY: currentY }; // Update ref after starting drag
+                onDragStart?.();
             }
         }
+        // Note: Actual drag move handling (highlighting targets) is done globally
+        // because the touchmove event might fire on the tag element initially,
+        // but then needs to track movement over the whole window.
     };
 
-    // タッチ終了ハンドラ
     const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-        if (!isTouchDevice || !isTouchDragging) return;
+        if (!isTouchDevice || !isTouchDragging) {
+            // If not dragging, potentially handle as a click if needed,
+            // otherwise just return. Reset maybe?
+            if (!isTouchDragging && onClick) {
+                // Check if it was a very short touch (tap)
+                // Requires timing or checking if position changed much
+                // onClick(); // Simplistic: call onClick if not dragged
+            }
+            cleanupTouchDrag(); // Ensure cleanup even if not dragging? Maybe not.
+            return;
+        }
 
+        // Prevent default actions like click events firing after touch ends
         e.preventDefault();
 
-        // ドラッグ終了時の処理
-        document.body.classList.remove('tag-dragging');
-        setIsTouchDragging(false);
+        const touch = e.changedTouches[0]; // Use changedTouches for end event
+        const endX = touch.clientX;
+        const endY = touch.clientY;
 
-        // 最後のタッチ位置を取得
-        const lastTouchX = lastTouch.clientX;
-        const lastTouchY = lastTouch.clientY;
+        // Find target at the final position
+        const finalTarget = findDropTargetAtPoint(endX, endY);
 
-        // ゴーストタグを削除
-        const ghostTag = document.getElementById('touch-drag-ghost');
-        if (ghostTag) {
-            document.body.removeChild(ghostTag);
-        }
-
-        // ドロップターゲットを探す
-        const dropTarget = findDropTarget(lastTouchX, lastTouchY);
-        if (dropTarget) {
-            // カスタムドロップイベントを発行
+        if (finalTarget) {
+            console.log(`Dispatching tagdrop to:`, finalTarget);
             const dropEvent = new CustomEvent('tagdrop', {
-                bubbles: true,
+                bubbles: true, // Allow event to bubble up
                 detail: { tag }
             });
-            dropTarget.dispatchEvent(dropEvent);
+            finalTarget.dispatchEvent(dropEvent);
+        } else {
+            console.log("No drop target found at", endX, endY);
+            // Dispatch leave event to the last known target if no new target is found at the end
+            if (currentDropTargetElement) {
+                dispatchTagDragLeave(currentDropTargetElement);
+            }
         }
 
-        if (onDragEnd) {
-            onDragEnd();
-        }
+        // Clean up drag state, ghost element, and body class
+        cleanupTouchDrag();
+        onDragEnd?.(); // Call provided callback
     };
 
-    // タッチがキャンセルされた場合のハンドラ
     const handleTouchCancel = (e: React.TouchEvent<HTMLDivElement>) => {
         if (!isTouchDevice || !isTouchDragging) return;
 
-        // クリーンアップ
-        document.body.classList.remove('tag-dragging');
-        setIsTouchDragging(false);
+        console.log("Touch cancelled");
+        e.preventDefault();
 
-        // ゴーストタグを削除
-        const ghostTag = document.getElementById('touch-drag-ghost');
-        if (ghostTag) {
-            document.body.removeChild(ghostTag);
+        // Dispatch leave event to the last known target
+        if (currentDropTargetElement) {
+            dispatchTagDragLeave(currentDropTargetElement);
         }
 
-        if (onDragEnd) {
-            onDragEnd();
-        }
+        cleanupTouchDrag();
+        onDragEnd?.(); // Consider if onDragEnd should be called on cancel
     };
 
-    // ゴーストタグの位置を更新する関数
+    // Helper Functions for Touch Drag
+    const createGhostElement = (tagText: string, style: TagStyle) => {
+        let ghost = document.getElementById('touch-drag-ghost');
+        if (!ghost) {
+            ghost = document.createElement('div');
+            ghost.id = 'touch-drag-ghost';
+            // Apply necessary styles (use Tailwind classes if preferred and available globally)
+            ghost.style.position = 'fixed';
+            ghost.style.zIndex = '9999';
+            ghost.style.pointerEvents = 'none'; // Crucial!
+            ghost.style.opacity = '0.8';
+            ghost.style.borderRadius = '999px';
+            ghost.style.padding = '6px 12px';
+            ghost.style.fontSize = '14px';
+            ghost.style.fontWeight = '500';
+            ghost.style.whiteSpace = 'nowrap';
+            ghost.style.transform = 'translate(-50%, -50%)'; // Center on touch point
+            // Apply tag-specific colors - ensure these classes are globally available or use inline styles
+            ghost.className = `${style.bg} ${style.text} ${style.border}`; // Example using style object
+            document.body.appendChild(ghost);
+        }
+        ghost.innerText = tagText;
+    };
+
     const updateGhostPosition = (x: number, y: number) => {
-        const ghostTag = document.getElementById('touch-drag-ghost');
-        if (ghostTag) {
-            ghostTag.style.left = `${x - 50}px`; // 中央に調整
-            ghostTag.style.top = `${y - 25}px`;  // 中央に調整
-
-            // 最後のタッチ位置を更新
-            setLastTouch({ clientX: x, clientY: y });
+        const ghost = document.getElementById('touch-drag-ghost');
+        if (ghost) {
+            ghost.style.left = `${x}px`;
+            ghost.style.top = `${y}px`;
         }
     };
 
-    // ドロップターゲットを見つける関数
-    const findDropTarget = (x: number, y: number) => {
-        // ドロップ可能なエリア（DroppableAreaコンポーネント）を探す
-        const elements = document.elementsFromPoint(x, y);
-        for (const element of elements) {
-            // ドロップ対象としてマークされた要素を探す
-            if (element.classList.contains('droppable-area') ||
-                element.hasAttribute('data-droppable') ||
-                element.id.includes('droppable')) {
-                return element;
-            }
+    const cleanupTouchDrag = () => {
+        document.body.classList.remove('tag-dragging');
+        const ghost = document.getElementById('touch-drag-ghost');
+        if (ghost) {
+            ghost.remove();
         }
-        return null;
+        setIsTouchDragging(false);
+        // Reset the global drop target tracker
+        currentDropTargetElement = null;
     };
 
-    // タッチムーブイベントのグローバルハンドラ（ドラッグ中のみ）
+    // --- Global Touch Move Handling ---
     useEffect(() => {
         const handleGlobalTouchMove = (e: TouchEvent) => {
-            if (isTouchDragging && e.touches.length === 1) {
-                const touch = e.touches[0];
-                updateGhostPosition(touch.clientX, touch.clientY);
+            // Only proceed if a touch drag is active *from this component*
+            // and there's exactly one touch point
+            if (!isTouchDragging || e.touches.length !== 1) {
+                // If drag stops unexpectedly (e.g., browser interruption), clean up.
+                // Might need more robust state check if multiple DraggableTags exist.
+                // if (isTouchDragging) cleanupTouchDrag();
+                return;
+            }
+
+            // Prevent scrolling while dragging
+            e.preventDefault();
+
+            const touch = e.touches[0];
+            const currentX = touch.clientX;
+            const currentY = touch.clientY;
+
+            // Update ghost position
+            updateGhostPosition(currentX, currentY);
+            lastTouchRef.current = { clientX: currentX, clientY: currentY }; // Keep track of position
+
+            // --- Drop Target Detection & Event Dispatching ---
+            const targetElement = findDropTargetAtPoint(currentX, currentY);
+
+            // Check if the target has changed
+            if (targetElement !== currentDropTargetElement) {
+                // Dispatch leave event to the previous target
+                if (currentDropTargetElement) {
+                    dispatchTagDragLeave(currentDropTargetElement);
+                }
+                // Dispatch enter event to the new target
+                if (targetElement) {
+                    dispatchTagDragEnter(targetElement);
+                }
+                // Update the current target
+                currentDropTargetElement = targetElement;
             }
         };
 
+        // Add listener only when dragging starts
         if (isTouchDragging) {
             window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+            // console.log("Global touchmove listener ADDED");
         }
 
+        // Cleanup: Remove listener when dragging stops or component unmounts
         return () => {
             window.removeEventListener('touchmove', handleGlobalTouchMove);
-        };
-    }, [isTouchDragging]);
-
-    // コンポーネントのアンマウント時にクラスを削除
-    useEffect(() => {
-        return () => {
-            document.body.classList.remove('tag-dragging');
-            // ゴーストタグがあれば削除
-            const ghostTag = document.getElementById('touch-drag-ghost');
-            if (ghostTag) {
-                document.body.removeChild(ghostTag);
+            // console.log("Global touchmove listener REMOVED");
+            // Ensure leave event is dispatched if component unmounts mid-drag
+            if (currentDropTargetElement && isTouchDragging) {
+                dispatchTagDragLeave(currentDropTargetElement);
+                currentDropTargetElement = null; // Reset tracker
             }
         };
-    }, []);
+    }, [isTouchDragging]); // Re-run useEffect when isTouchDragging changes
 
+
+    // --- Functions to find targets and dispatch custom events ---
+    const findDropTargetAtPoint = (x: number, y: number): Element | null => {
+        const ghost = document.getElementById('touch-drag-ghost');
+        let originalDisplay = '';
+        if (ghost) {
+            originalDisplay = ghost.style.display;
+            ghost.style.display = 'none'; // Hide ghost temporarily
+        }
+
+        const elementUnderPointer = document.elementFromPoint(x, y);
+
+        if (ghost) {
+            ghost.style.display = originalDisplay; // Restore ghost visibility
+        }
+
+        if (!elementUnderPointer) return null;
+
+        // Check if the element itself or an ancestor is droppable
+        return elementUnderPointer.closest('[data-droppable="true"]');
+    };
+
+    const dispatchTagDragEnter = (target: Element) => {
+        console.log("Dispatching tagdragenter to:", target);
+        const enterEvent = new CustomEvent('tagdragenter', { bubbles: true });
+        target.dispatchEvent(enterEvent);
+    };
+
+    const dispatchTagDragLeave = (target: Element) => {
+        console.log("Dispatching tagdragleave to:", target);
+        const leaveEvent = new CustomEvent('tagdragleave', { bubbles: true });
+        target.dispatchEvent(leaveEvent);
+    };
+
+    // Render the tag
     return (
         <div
-            className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${tagStyle.bg} ${tagStyle.text} ${tagStyle.hoverBg} border ${tagStyle.border} cursor-pointer transition-colors transform hover:scale-105 ${className}`}
-            onClick={onClick}
-            draggable="true"
+            className={`tag inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${tagStyle.bg} ${tagStyle.text} ${tagStyle.hoverBg} border ${tagStyle.border} cursor-grab transition-colors transform hover:scale-105 ${className}`}
+            onClick={!isTouchDragging ? onClick : undefined} // Only allow click if not dragging
+            draggable={!isTouchDevice} // Enable native drag only on non-touch devices
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchCancel}
-            data-tag={tag} // タグ情報をdata属性に保存
+            data-tag={tag}
+            style={{ touchAction: 'none' }} // Prevent browser gestures like scroll during touch on the tag itself
         >
-            <TagIcon className="w-3.5 h-3.5 mr-1.5" />
-            {tag}
+            <TagIcon className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />
+            <span className="truncate">{tag}</span> {/* Added truncate for potentially long tags */}
         </div>
     );
 };
