@@ -23,13 +23,18 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
     onDragEnd,
     className = "",
 }) => {
-    // タグ色の取得
+    // タグ色を取得
     const tagStyle: TagStyle =
         TAG_COLORS[tag as keyof typeof TAG_COLORS] || TAG_COLORS.default;
 
     /* ────────────── Drag handlers ────────────── */
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+        // ドラッグデータをセット
         e.dataTransfer.setData("tag", tag);
+
+        // デバッグ情報
+        console.log(`Drag started for tag: ${tag}`);
+        console.log("DataTransfer effectAllowed:", e.dataTransfer.effectAllowed);
         e.dataTransfer.effectAllowed = "copy";
 
         // カスタム drag image
@@ -37,18 +42,28 @@ const DraggableTag: React.FC<DraggableTagProps> = ({
             const ghost = e.currentTarget.cloneNode(true) as HTMLElement;
             ghost.style.position = "absolute";
             ghost.style.top = "-1000px";
-            ghost.style.opacity = "0.85";
+            ghost.style.opacity = "0.8";
             document.body.appendChild(ghost);
-            e.dataTransfer.setDragImage(ghost, 12, 12);
+            e.dataTransfer.setDragImage(ghost, 10, 10);
             setTimeout(() => document.body.removeChild(ghost), 0);
         }
 
+        // ドラッグ開始時のクラスを追加
         document.body.classList.add("tag-dragging");
+
+        // 親への通知
         onDragStart?.();
     };
 
     const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        // デバッグ情報
+        console.log(`Drag ended for tag: ${tag}`);
+        console.log("Drag result:", e.dataTransfer.dropEffect);
+
+        // クラスを除去
         document.body.classList.remove("tag-dragging");
+
+        // 親への通知
         onDragEnd?.();
     };
 
