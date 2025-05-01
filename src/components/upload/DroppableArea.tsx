@@ -1,6 +1,7 @@
-// src/components/upload/DroppableArea.tsx
+// src/components/upload/DroppableArea.tsx の修正
+
 import { TagIcon } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface DroppableAreaProps {
     id: string;
@@ -66,12 +67,51 @@ const DroppableArea: React.FC<DroppableAreaProps> = ({
         }
     };
 
+    // カスタムタグドロップイベントのハンドラ
+    const handleTagDrop = (e: Event) => {
+        // カスタムイベントからタグを取得
+        const customEvent = e as CustomEvent;
+        const tag = customEvent.detail?.tag;
+
+        if (tag) {
+            console.log(`Custom tag drop detected: ${tag} on ${id}`);
+            setIsDragOver(false);
+            onDrop(id, tag);
+        }
+    };
+
+    // カスタムタグドラッグスタートイベントのハンドラ
+    const handleTagDragEnter = (e: Event) => {
+        // ここでドラッグエンター検出のロジックを追加
+        setIsDragOver(true);
+    };
+
+    // タッチイベント用のカスタムイベントリスナー
+    useEffect(() => {
+        const element = document.getElementById(`droppable-${id}`);
+        if (element) {
+            element.addEventListener('tagdrop', handleTagDrop);
+
+            // 必要に応じてドラッグエンターの検出を追加
+            document.addEventListener('tagdragstart', handleTagDragEnter);
+        }
+
+        return () => {
+            if (element) {
+                element.removeEventListener('tagdrop', handleTagDrop);
+            }
+            document.removeEventListener('tagdragstart', handleTagDragEnter);
+        };
+    }, [id, onDrop]);
+
     return (
         <div
-            className={`${className} ${isDragOver ? 'ring-2 ring-indigo-500 ring-opacity-50' : ''} transition-all`}
+            id={`droppable-${id}`}
+            className={`droppable-area ${className} ${isDragOver ? 'ring-2 ring-indigo-500 ring-opacity-50' : ''} transition-all`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            data-droppable="true" // ドロップ可能エリアとしてマーク
         >
             {children}
 
